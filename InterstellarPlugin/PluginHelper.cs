@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using UnityEngine;
 using System.Reflection;
@@ -51,8 +52,41 @@ namespace InterstellarPlugin {
         protected static int installed_tech_tree_version_id = 0;
         protected static int new_tech_tree_version_id = 0;
         
-        
-        
+        private static IDictionary<string, string> techNames = null;
+
+        public static string GetTechName(string techId)
+        {
+            if (techNames == null)
+                ReadTechNames();
+            if (techNames == null)
+                return null;
+            return techNames[techId];
+        }
+
+        private static void ReadTechNames()
+        {
+            try
+            {
+                IDictionary<string, string> newTechNames = new Dictionary<string, string>();
+                ConfigNode config = ConfigNode.Load(getNewTechTreeFilePath());
+                foreach (var node in config.GetNodes("NODE"))
+                {
+                    string id = node.GetValue("techID");
+                    string name = node.GetValue("title");
+                    if (id != null && name != null)
+                        newTechNames[id] = name;
+                }
+                techNames = newTechNames;
+#if DEBUG
+                print("[KSPI] Read " + techNames.Count + " tech names");
+#endif
+            }
+            catch
+            {
+                print("[KSPI] Could not load tech tree.");
+            }
+        }
+
         public static string getPluginSaveFilePath() {
             return KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/Interstellar.cfg";
         }
@@ -509,4 +543,19 @@ namespace InterstellarPlugin {
 			}
 		}
     }
+
+    internal static class DebugLogEx
+    {
+#if DEBUG
+        public static void PrintD(this MonoBehaviour mb, string message)
+        {
+            MonoBehaviour.print(
+                String.Format("[KSPI] {0}[{1}]: {2}",
+                    mb.GetType().Name,
+                    RuntimeHelpers.GetHashCode(mb),
+                    message));
+        }
+#endif
+    }
+
 }

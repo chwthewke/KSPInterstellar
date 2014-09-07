@@ -9,7 +9,7 @@ using OpenResourceSystem;
 
 namespace InterstellarPlugin
 {
-    class FNReactor : FNResourceSuppliableModule, FNThermalSource, FNUpgradeableModule
+    abstract class FNReactor : FNResourceSuppliableModule, FNThermalSource, FNUpgradeableModule
     {
         // Persistent True
         [KSPField(isPersistant = true)]
@@ -47,7 +47,8 @@ namespace InterstellarPlugin
         [KSPField(isPersistant = false)]
         public float radius;
         [KSPField(isPersistant = false)]
-        public string upgradeTechReq = null;
+        public string upgradeTechReq;
+        public string UpgradeTechReq { get { return upgradeTechReq; } }
         [KSPField(isPersistant = false)]
         public float resourceRate;
         [KSPField(isPersistant = false)]
@@ -62,11 +63,11 @@ namespace InterstellarPlugin
         public float upgradedChargedParticleRatio;
 
         // GUI
-        [KSPField(isPersistant = false, guiActive = true, guiName = "Type")]
+        [KSPField(isPersistant = false, guiActive = true, guiName = "Type", guiActiveEditor = true)]
         public string reactorType;
         [KSPField(isPersistant = false, guiActive = false, guiName = "Fuel Mode")]
         public string fuelmodeStr;
-        [KSPField(isPersistant = false, guiActive = true, guiName = "Core Temp")]
+        [KSPField(isPersistant = false, guiActive = true, guiName = "Core Temp", guiActiveEditor = true)]
         public string coretempStr;
         [KSPField(isPersistant = false, guiActive = true, guiName = "Status")]
         public string statusStr;
@@ -99,8 +100,8 @@ namespace InterstellarPlugin
         protected double thermal_power_ratio = 0;
         protected double charged_power_ratio = 0;
         protected bool convert_charged_to_thermal = true;
-        protected string name_to_use;
 
+        private EventData<ShipConstruct>.OnEvent onShipModified;
 
         //protected bool responsible_for_thermalmanager = false;
         //protected FNResourceManager thermalmanager;
@@ -186,10 +187,7 @@ namespace InterstellarPlugin
         public override void OnLoad(ConfigNode node)
         {
             reactorType = originalName;
-            if (isupgraded)
-            {
-                upgradePartModule();
-            }
+
             //tritium_rate = ThermalPower/1000.0f/28800.0f;
         }
 
@@ -199,20 +197,25 @@ namespace InterstellarPlugin
             if (upgradedThermalPower > 0)
             {
                 ThermalPower = upgradedThermalPower;
+#if DEBUG
+                this.PrintD("upgradePartModule: TP = " + ThermalPower);
+#endif
             }
+
             if (upgradedReactorTemp > 0)
             {
                 ReactorTemp = upgradedReactorTemp;
+#if DEBUG
+                this.PrintD("upgradePartModule: T°K = " + ReactorTemp);
+#endif
             }
             if (upgradedName.Length > 0)
             {
                 reactorType = upgradedName;
-                name_to_use = upgradedName;
             }
             else
             {
                 reactorType = originalName;
-                name_to_use = originalName;
             }
             if (upgradedResourceRate > 0)
             {
@@ -222,13 +225,15 @@ namespace InterstellarPlugin
             {
                 chargedParticleRatio = upgradedChargedParticleRatio;
             }
+            UpdateDisplayFields();
         }
 
         public override void OnStart(PartModule.StartState state)
         {
             String[] resources_to_supply = { FNResourceManager.FNRESOURCE_THERMALPOWER, FNResourceManager.FNRESOURCE_WASTEHEAT, FNResourceManager.FNRESOURCE_CHARGED_PARTICLES };
             this.resources_to_supply = resources_to_supply;
-            //name_to_use = originalName;
+            UpdateDisplayFields();
+
             base.OnStart(state);
 
             Actions["ActivateReactorAction"].guiName = Events["ActivateReactor"].guiName = String.Format("Activate Reactor");
@@ -242,18 +247,24 @@ namespace InterstellarPlugin
                     Events["ActivateReactorVAB"].guiActiveEditor = true;
                     Events["DeactivateReactorVAB"].guiActiveEditor = false;
                 }
-                if (hasTechsRequiredToUpgrade())
+
+                onShipModified = _ => UpdateDisplayFields();
+                GameEvents.onEditorShipModified.Add(onShipModified);
+#if DEBUG
+                this.PrintD("Attached listener to onEditorShipModified");
+#endif
+                part.OnEditorDestroy += () =>
                 {
-                    isupgraded = true;
-                    upgradePartModule();
-                }
+                    GameEvents.onEditorShipModified.Remove(onShipModified);
+#if DEBUG
+                    this.PrintD("Removed listener from onEditorShipModified");
+#endif
+                };
+
+
                 return;
             }
-
-            if (hasTechsRequiredToUpgrade())
-            {
-                hasrequiredupgrade = true;
-            }
+            
 
             if (startDisabled)
             {
@@ -312,6 +323,7 @@ namespace InterstellarPlugin
                 }
             }
             this.part.force_activate();
+
         }
 
         public override void OnUpdate()
@@ -332,7 +344,8 @@ namespace InterstellarPlugin
             Fields["tritiumBreedRate"].guiActive = breedtritium && isNeutronRich() && IsEnabled;
             //Fields["currentPwr"].guiActive = IsEnabled;
             //Fields["currentPwr2"].guiActive = IsEnabled;
-            coretempStr = ReactorTemp.ToString("0") + "K";
+            UpdateDisplayFields();
+
             if (IsEnabled)
             {
                 if (play_up && anim != null)
@@ -417,13 +430,39 @@ namespace InterstellarPlugin
                 last_draw_update = update_count;
             }
 
-            //if (isupgraded) {
-            //    reactorType = getPowerFormatString(ThermalPower) + " " + upgradedName;
-            //} else {
-            reactorType = getPowerFormatString(ThermalPower) + " " + name_to_use;
-            //}
 
             update_count++;
+        }
+
+        private void UpdateDisplayFields()
+        {
+            reactorType = getPowerFormatString(ThermalPower) + " " + (isupgraded ? upgradedName : originalName);
+            coretempStr = ReactorTemp.ToString("0") + "K";
+        }
+
+
+        public override string GetInfo()
+        {
+#if DEBUG
+            this.PrintD("GetInfo - upgradeTechReq: " + upgradeTechReq);
+#endif
+
+            const string variantInfoFormat = 
+            "Part name: {0} Reactor\n" +
+            "Core Temperature: {1:n0}K\n" +
+            "Total Power Output: {2:n0} MW\n" +
+            "Consumption Rate (Max): {3} Kg/day";
+
+            var b = new StringBuilder();
+            b.AppendFormat(variantInfoFormat,
+                originalName, ReactorTemp, ThermalPower, resourceRate);
+            if (this.IsUpgradeable())
+            {
+                b.AppendFormat("\n\n[Upgraded with {0} to:]\n", PluginHelper.GetTechName(upgradeTechReq));
+                b.AppendFormat(variantInfoFormat, upgradedName, upgradedReactorTemp, upgradedThermalPower,
+                    upgradedResourceRate);
+            }
+            return b.ToString();
         }
 
         public virtual float getCoreTemp()
@@ -491,28 +530,6 @@ namespace InterstellarPlugin
 
         public bool isVolatileSource()
         {
-            return false;
-        }
-
-        public bool hasTechsRequiredToUpgrade()
-        {
-            if (HighLogic.CurrentGame != null)
-            {
-                if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER | HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
-                {
-                    if (upgradeTechReq != null)
-                    {
-                        if (PluginHelper.hasTech(upgradeTechReq))
-                        {
-                            return true;
-                        }
-                    }
-                }
-                else
-                {
-                    return true;
-                }
-            }
             return false;
         }
 

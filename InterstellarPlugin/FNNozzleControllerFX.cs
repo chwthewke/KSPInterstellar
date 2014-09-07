@@ -27,10 +27,12 @@ namespace InterstellarPlugin{
 		public string originalName;
 		[KSPField(isPersistant = false)]
 		public string upgradedName;
-		[KSPField(isPersistant = false)]
-		public float radius; 
-		[KSPField(isPersistant = false)]
-		public string upgradeTechReq = null;
+        [KSPField(isPersistant = false)]
+        public string upgradeTechReq;
+        public string UpgradeTechReq { get { return upgradeTechReq; } }
+        [KSPField(isPersistant = false)]
+		public float radius;
+
 
 		//External
 		public bool static_updating = true;
@@ -115,7 +117,7 @@ namespace InterstellarPlugin{
             engineType = originalName;
             // check whether we have the technologies available to be able to perform an upgrade
             if (state == StartState.Editor) {
-                if (hasTechsRequiredToUpgrade()) {
+                if (this.HasRequiredTechForUpgrade()) {
                     isupgraded = true;
                     upgradePartModule();
                 }
@@ -425,25 +427,10 @@ namespace InterstellarPlugin{
 			static_updating2 = true;
 		}
 
-        public bool hasTechsRequiredToUpgrade() {
-            if (HighLogic.CurrentGame != null) {
-                if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER | HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
-                {
-                    if (upgradeTechReq != null) {
-                        if (PluginHelper.hasTech(upgradeTechReq)) {
-                            return true;
-                        }
-                    }
-                } else {
-                    return true;
-                }
-            }
-            return false;
-        }
 
 		public override string GetInfo() {
 			bool upgraded = false;
-            if (hasTechsRequiredToUpgrade()) {
+            if (this.HasRequiredTechForUpgrade()) {
                 upgraded = true;
             }
 			ConfigNode[] prop_nodes;
