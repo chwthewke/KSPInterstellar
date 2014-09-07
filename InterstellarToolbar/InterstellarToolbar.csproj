@@ -32,24 +32,24 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>..\..\KSPLibs\0.24\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="InterstellarPlugin, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\GameData\Interstellar\Plugins\InterstellarPlugin.dll</HintPath>
+      <HintPath>..\InterstellarPlugin\obj\Debug\InterstellarPlugin.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenResourceSystem_1_2_1">
-      <HintPath>..\GameData\OpenResourceSystem\Plugins\OpenResourceSystem_1_2_1.dll</HintPath>
+      <HintPath>..\..\KSPLibs\ORS\OpenResourceSystem_1_2_1.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Toolbar">
-      <HintPath>..\GameData\000_Toolbar\Toolbar.dll</HintPath>
+      <HintPath>..\..\KSPLibs\Toolbar\1.7.2\Toolbar.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Kerbal Space Program\KSP_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>..\..\KSPLibs\0.24\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
