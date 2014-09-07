@@ -1,5 +1,5 @@
 *.userprefs
-InterstellarPLugin/bin
+InterstellarPlugin/bin
 InterstellarPlugin/obj
 InterstellarPlugin/Interstellar
 OpenResourceSystem/bin
@@ -9,3 +9,4 @@ OpenResourceSystem/OpenResourceSystem
 *.suo
 *db
 *.dll
+InterstellarToolbar/obj/
