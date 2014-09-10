@@ -10,15 +10,6 @@ namespace InterstellarPlugin {
             return false;
         }
 
-        public override string GetInfo() {
-            //if (!hasTechsRequiredToUpgrade()) {
-            //    return String.Format("[Base Part Information]\nPart Name: {0}\nCore Temperature: {1:n0}K\nTotal Power Output: {2:n0}MW\nAntimatter Consumption Rate (Max):\n{3}mg/sec\n\n[Upgrade Information]\nScience Tech Required:\n- {4}\nPart Name: {5}\nCore Temperature: {6:n0}K\nTotal Power Output: {7:n0}MW\nAntimatter Consumption (Max):\n{8}mg/sec", originalName, ReactorTemp, ThermalPower, resourceRate, upgradeTechReq, upgradedName, upgradedReactorTemp, upgradedThermalPower, upgradedResourceRate);
-            //} else {
-            //    return String.Format(upgradedName + "\nThis part is available automatically upgraded\nCore Temperature: {0}K\n Thermal Power: {1}MW\n Antimatter Max Consumption Rate: {2}mg/sec\n", upgradedReactorTemp, upgradedThermalPower, upgradedResourceRate);
-                return String.Format("\nCore Temperature: " + ReactorTemp + "K\nTotal Power Output: " + ThermalPower + "MW\nConsumption Rate (Max):\n- " + resourceRate + "Kg/day");
-            //}
-        }
-
         protected override double consumeReactorResource(double resource) {
             List<PartResource> antimatter_resources = new List<PartResource>();
             part.GetConnectedResources(PartResourceLibrary.Instance.GetDefinition("Antimatter").id, PartResourceLibrary.Instance.GetDefinition("Antimatter").resourceFlowMode, antimatter_resources);

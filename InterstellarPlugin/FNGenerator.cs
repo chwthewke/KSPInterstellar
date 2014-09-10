@@ -36,6 +36,7 @@ namespace InterstellarPlugin
         public string animName;
         [KSPField(isPersistant = false)]
         public string upgradeTechReq;
+        public string UpgradeTechReq { get { return upgradeTechReq; } }
         [KSPField(isPersistant = false)]
         public float upgradeCost;
         [KSPField(isPersistant = false)]
@@ -176,6 +177,9 @@ namespace InterstellarPlugin
             String[] resources_to_supply = { FNResourceManager.FNRESOURCE_MEGAJOULES, FNResourceManager.FNRESOURCE_WASTEHEAT };
             this.resources_to_supply = resources_to_supply;
             base.OnStart(state);
+
+            Fields["generatorType"].guiActive = this.IsUpgradeable();
+            
             generatorType = originalName;
             if (state == StartState.Editor)
             {
@@ -351,29 +355,6 @@ namespace InterstellarPlugin
             return myAttachedReactor;
         }
 
-        public bool hasTechsRequiredToUpgrade()
-        {
-            //if (HighLogic.CurrentGame != null)
-            //{
-            //    if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER | HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
-            //    {
-            //        if (upgradeTechReq != null)
-            //        {
-            //            if (PluginHelper.hasTech(upgradeTechReq))
-            //            {
-            //                //return true;
-            //                return false;
-            //            }
-            //        }
-            //    }
-            //    else
-            //    {
-            //        return true;
-            //    }
-            //}
-            return false;
-        }
-
         public void updateGeneratorPower()
         {
             hotBathTemp = myAttachedReactor.getCoreTemp();
@@ -459,10 +440,18 @@ namespace InterstellarPlugin
             }
         }
 
+        private const string VARIANT_INFO_FORMAT = "Part name: {0}\nCarnot Efficiency: {1}%";
+
         public override string GetInfo()
         {
-            //return String.Format("[Base Part Information]\nPart Name: {0}\nCarnot Efficiency: {1}%\n\n[Upgraded Information]\nScience Tech Required:\n- {2}\n\n[{3} Mode]\n- Carnot Efficiency: {4}%\n\n[{5} Mode]\n- Carnot Efficiency: {6}%", originalName, pCarnotEff * 100, upgradeTechReq, upgradedName, upgradedpCarnotEff * 100, altUpgradedName, 85);
-            return String.Format("Carnot Efficiency: " + pCarnotEff * 100 + "%");
+            var b = new StringBuilder();
+            b.AppendFormat(VARIANT_INFO_FORMAT, originalName, pCarnotEff * 100);
+            if (this.IsUpgradeable())
+            {
+                b.AppendFormat("\n\n[Upgraded with {0} to:]\n", PluginHelper.GetTechName(upgradeTechReq));
+                b.AppendFormat(VARIANT_INFO_FORMAT, upgradedName, upgradedpCarnotEff*100);
+            }
+            return b.ToString();
         }
 
         protected string getPowerFormatString(double power)

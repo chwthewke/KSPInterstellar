@@ -32,7 +32,8 @@ namespace InterstellarPlugin
         [KSPField(isPersistant = false)]
         public float radius;
         [KSPField(isPersistant = false)]
-        public string upgradeTechReq = null;
+        public string upgradeTechReq;
+        public string UpgradeTechReq { get { return upgradeTechReq; } }
 
         //External
         public bool static_updating = true;
@@ -164,7 +165,7 @@ namespace InterstellarPlugin
             {
                 part.OnEditorAttach += OnEditorAttach;
                 propellants = getPropellants(isJet);
-                if (hasTechsRequiredToUpgrade() && isJet)
+                if (this.HasRequiredTechForUpgrade() && isJet)
                 {
                     isupgraded = true;
                     upgradePartModule();
@@ -187,7 +188,7 @@ namespace InterstellarPlugin
             }
             else
             {
-                if (hasTechsRequiredToUpgrade() && isJet)
+                if (this.HasRequiredTechForUpgrade() && isJet)
                 {
                     hasrequiredupgrade = true;
                 }
@@ -345,6 +346,10 @@ namespace InterstellarPlugin
                 {
                     TogglePropellant();
                 }
+                else
+                {
+                    updateIspEngineParams();
+                }
             }
             else
             {
@@ -446,7 +451,7 @@ namespace InterstellarPlugin
                 if (myAttachedReactor is FNUpgradeableModule)
                 {
                     FNUpgradeableModule upmod = (FNUpgradeableModule)myAttachedReactor;
-                    if (upmod.hasTechsRequiredToUpgrade())
+                    if (upmod.HasRequiredTechForUpgrade())
                     {
                         attached_reactor_upgraded = true;
                     }
@@ -620,32 +625,11 @@ namespace InterstellarPlugin
             static_updating2 = true;
         }
 
-        public bool hasTechsRequiredToUpgrade()
-        {
-            if (HighLogic.CurrentGame != null)
-            {
-                if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER | HighLogic.CurrentGame.Mode == Game.Modes.SCIENCE_SANDBOX)
-                {
-                    if (upgradeTechReq != null)
-                    {
-                        if (PluginHelper.hasTech(upgradeTechReq))
-                        {
-                            return true;
-                        }
-                    }
-                }
-                else
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
 
         public override string GetInfo()
         {
             bool upgraded = false;
-            if (hasTechsRequiredToUpgrade())
+            if (this.HasRequiredTechForUpgrade())
             {
                 upgraded = true;
             }

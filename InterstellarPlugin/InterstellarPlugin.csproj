@@ -106,6 +106,7 @@
     <Compile Include="ResourceAbundanceMarker.cs" />
     <Compile Include="ScienceModule.cs" />
     <Compile Include="TechUpdateWindow.cs" />
+    <Compile Include="FNUpgradeModule.cs" />
     <Compile Include="VABThermalUI.cs" />
     <Compile Include="VanAllen.cs" />
     <Compile Include="VesselMicrowavePersistence.cs" />

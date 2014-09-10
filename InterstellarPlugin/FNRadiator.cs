@@ -7,7 +7,7 @@ using UnityEngine;
 namespace InterstellarPlugin
 {
     [KSPModule("Radiator")]
-    class FNRadiator : FNResourceSuppliableModule
+    class FNRadiator : FNResourceSuppliableModule, FNUpgradeableModule
     {
         [KSPField(isPersistant = true)]
         public bool radiatorIsEnabled;
@@ -18,6 +18,7 @@ namespace InterstellarPlugin
 
         [KSPField(isPersistant = false)]
         public string upgradeTechReq;
+        public string UpgradeTechReq { get { return upgradeTechReq; } }
         [KSPField(isPersistant = false)]
         public bool isDeployable = true;
         [KSPField(isPersistant = false)]
@@ -190,6 +191,15 @@ namespace InterstellarPlugin
         //    ResearchAndDevelopment.Instance.Science = ResearchAndDevelopment.Instance.Science - upgradeCost;
         //}
 
+        public void upgradePartModule()
+        {
+            isupgraded = true;
+
+            radiatorType = upgradedName;
+            radiatorTemp = upgradedRadiatorTemp;
+            radiatorTempStr = radiatorTemp + "K";
+        }
+
         [KSPAction("Deploy Radiator")]
         public void DeployRadiatorAction(KSPActionParam param)
         {
@@ -217,20 +227,11 @@ namespace InterstellarPlugin
 
         public override void OnStart(PartModule.StartState state)
         {
+            Fields["radiatorType"].guiActive = Fields["radiatorType"].guiActiveEditor = this.IsUpgradeable();
+
             Actions["DeployRadiatorAction"].guiName = Events["DeployRadiator"].guiName = String.Format("Deploy Radiator");
             Actions["RetractRadiatorAction"].guiName = Events["RetractRadiator"].guiName = String.Format("Retract Radiator");
             Actions["ToggleRadiatorAction"].guiName = String.Format("Toggle Radiator");
-
-            if (state == StartState.Editor)
-            {
-                //if (hasTechsRequiredToUpgrade())
-                //{
-                //    isupgraded = true;
-                //    hasrequiredupgrade = true;
-                //    isupgraded = true;
-                //}
-                //return;
-            }
 
 
             FNRadiator.list_of_radiators.Add(this);
@@ -278,15 +279,7 @@ namespace InterstellarPlugin
                 radiatorInit = true;
             }
 
-            //if (!isupgraded)
-            //{
                 radiatorType = originalName;
-            //}
-            //else
-            //{
-            //    radiatorType = upgradedName;
-            //    radiatorTemp = upgradedRadiatorTemp;
-            //}
 
             radiatorTempStr = radiatorTemp + "K";
             this.part.force_activate();
@@ -397,6 +390,10 @@ namespace InterstellarPlugin
                     //part.breakingTorque = 1;
                     part.decouple(1);
                 }
+            }
+            else
+            {
+                convectedThermalPower = 0;
             }
 
 
@@ -521,14 +518,40 @@ namespace InterstellarPlugin
 
         public override string GetInfo()
         {
-            float thermal_power_dissip = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(radiatorTemp, 4) / 1e6);
-            //float thermal_power_dissip2 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(upgradedRadiatorTemp, 4) / 1e6);
-            float thermal_power_dissip3 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(600, 4) / 1e6);
-            float thermal_power_dissip4 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(1200, 4) / 1e6);
-            float thermal_power_dissip5 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(1800, 4) / 1e6);
-            float thermal_power_dissip6 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(2400, 4) / 1e6);
-            float thermal_power_dissip7 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(3000, 4) / 1e6);
-            return String.Format("Heat Radiated (Max): {0:n0} MW\n\nRadiator Performance at:\n600K: {1:n0} MW\n1,200K: {2:n0} MW\n1,800K: {3:n0} MW\n2,400K: {4:n0} MW\n3,000K: {5:n0} MW\n", thermal_power_dissip, thermal_power_dissip3, thermal_power_dissip4, thermal_power_dissip5, thermal_power_dissip6, thermal_power_dissip7);
+            var temps = new SortedDictionary<float, float>();
+            const int tempScale = 500;
+            
+            for (int temp = tempScale; temp < (this.IsUpgradeable() ? upgradedRadiatorTemp : radiatorTemp); temp += tempScale)
+                AddTempPoint(temps, temp);
+            AddTempPoint(temps, radiatorTemp);
+            if (this.IsUpgradeable())
+                AddTempPoint(temps, upgradedRadiatorTemp);
+
+            const string variantInfoFormat = "Part Name: {0}\nHeat Radiated (max): {1:n0} MW";
+            const string tempPointFormat = "\n  at {0}K: {1:n0} MW";
+
+            var b = new StringBuilder();
+            b.AppendFormat(variantInfoFormat, originalName, HeatDissipation(radiatorTemp));
+            b.Append("\nRadiator Performance");
+            foreach (var tempPoint in temps)
+                b.AppendFormat(tempPointFormat, tempPoint.Key, tempPoint.Value);
+            if (this.IsUpgradeable())
+            {
+                b.AppendFormat("\n\n[Upgraded with {0} to:]\n", PluginHelper.GetTechName(upgradeTechReq));
+                b.AppendFormat(variantInfoFormat, upgradedName, HeatDissipation(upgradedRadiatorTemp));
+            }
+
+            return b.ToString();
+        }
+
+        private void AddTempPoint(IDictionary<float, float> temps, float temp)
+        {
+            temps[temp] = HeatDissipation(temp);
+        }
+
+        private float HeatDissipation(float temp)
+        {
+            return (float) (GameConstants.stefan_const * radiatorArea * Math.Pow(temp, 4) / 1e6);
         }
 
         public override int getPowerPriority()
