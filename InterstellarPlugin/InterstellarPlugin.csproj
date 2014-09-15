@@ -42,8 +42,9 @@
       <HintPath>..\..\KSPLibs\ORS\OpenResourceSystem_1_2_1.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Scale_Redist">
-      <HintPath>..\..\TweakScale\Gamedata\TweakScale\plugins\Scale_Redist.dll</HintPath>
+    <Reference Include="Scale_Redist, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\KSPLibs\TweakScale\Scale_Redist.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="UnityEngine">

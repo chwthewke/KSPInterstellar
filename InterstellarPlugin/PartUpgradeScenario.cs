@@ -5,19 +5,30 @@ using System.Text;
 
 namespace InterstellarPlugin
 {
+    [KSPScenario(ScenarioCreationOptions.AddToAllGames, GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.FLIGHT)]
     public class PartUpgradeScenario: ScenarioModule
     {
         public const string ScenarioName = "KspilPartUpgrades";
 
         internal const string UnlockedRequirementNode = "UNLOCKED";
 
-        private ICollection<FulfilledRequirement> fulfilledRequirements = new HashSet<FulfilledRequirement>(); 
+        private ICollection<FulfilledRequirement> fulfilledRequirements = new HashSet<FulfilledRequirement>();
+        private static PartUpgradeScenario instance;
 
         public static PartUpgradeScenario Instance
         {
-            get { return GetOrCreateScenario(HighLogic.CurrentGame); }
+            get { return instance; }
         }
 
+        public override void OnAwake()
+        {
+            if (instance != null)
+                return;
+            instance = this;
+        }
+
+
+        // TODO obsolete
         private static PartUpgradeScenario GetOrCreateScenario(Game game)
         {
             if (game == null)
@@ -75,13 +86,13 @@ namespace InterstellarPlugin
         private const string PartKey = "part";
         private const string IdKey = "id";
 
-        // TODO validate null or empty, warn
         public FulfilledRequirement(string partName, string requirementId)
         {
             this.partName = partName;
             this.requirementId = requirementId;
         }
 
+        // TODO validate null or empty, warn, or ConfigNode.Load
         public FulfilledRequirement(ConfigNode node)
         {
             partName = node.GetValue(PartKey);
