@@ -42,6 +42,9 @@
       <HintPath>..\..\KSPLibs\ORS\OpenResourceSystem_1_2_1.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Scale_Redist">
+      <HintPath>..\..\TweakScale\Gamedata\TweakScale\plugins\Scale_Redist.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="UnityEngine">
       <HintPath>..\..\KSPLibs\0.24\UnityEngine.dll</HintPath>
@@ -101,6 +104,9 @@
     <Compile Include="ModuleModableScienceGenerator.cs" />
     <Compile Include="ModuleSabreHeating.cs" />
     <Compile Include="ModuleSolarSail.cs" />
+    <Compile Include="PartUpgradeModule.cs" />
+    <Compile Include="IPartUpgradeRequirement.cs" />
+    <Compile Include="PartUpgradeScenario.cs" />
     <Compile Include="PluginHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ResourceAbundanceMarker.cs" />
