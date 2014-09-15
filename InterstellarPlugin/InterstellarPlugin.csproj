@@ -106,7 +106,7 @@
     <Compile Include="ModuleSabreHeating.cs" />
     <Compile Include="ModuleSolarSail.cs" />
     <Compile Include="PartUpgradeModule.cs" />
-    <Compile Include="IPartUpgradeRequirement.cs" />
+    <Compile Include="PartUpgradeRequirement.cs" />
     <Compile Include="PartUpgradeScenario.cs" />
     <Compile Include="PluginHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -2,17 +2,20 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using UnityEngine;
 
 namespace InterstellarPlugin
 {
     [KSPScenario(ScenarioCreationOptions.AddToAllGames, GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.FLIGHT)]
-    public class PartUpgradeScenario: ScenarioModule
+    public class PartUpgradeScenario : ScenarioModule
     {
         public const string ScenarioName = "KspilPartUpgrades";
 
         internal const string UnlockedRequirementNode = "UNLOCKED";
 
-        private ICollection<FulfilledRequirement> fulfilledRequirements = new HashSet<FulfilledRequirement>();
+        private readonly ICollection<FulfilledRequirement> fulfilledRequirements =
+            new HashSet<FulfilledRequirement>();
+
         private static PartUpgradeScenario instance;
 
         public static PartUpgradeScenario Instance
@@ -39,7 +42,7 @@ namespace InterstellarPlugin
                 return scenario;
 
             ProtoScenarioModule protoModule =
-                game.AddProtoScenarioModule(typeof (PartUpgradeScenario),
+                game.AddProtoScenarioModule(typeof(PartUpgradeScenario),
                     GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.SPH);
 
             if (protoModule.targetScenes.Contains(HighLogic.LoadedScene))
@@ -78,6 +81,11 @@ namespace InterstellarPlugin
             {
                 fulfilledRequirements.Add(new FulfilledRequirement(requirementNode));
             }
+
+#if DEBUG
+            Debug.Log("PartUpgradeScenario loaded with fulfilled requirements: " +
+            string.Join(", ", fulfilledRequirements.Select(r => r.ToString()).ToArray()));
+#endif
         }
     }
 
@@ -128,14 +136,14 @@ namespace InterstellarPlugin
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj)) return false;
-            return obj is FulfilledRequirement && Equals((FulfilledRequirement) obj);
+            return obj is FulfilledRequirement && Equals((FulfilledRequirement)obj);
         }
 
         public override int GetHashCode()
         {
             unchecked
             {
-                return (partName.GetHashCode()*397) ^ requirementId.GetHashCode();
+                return (partName.GetHashCode() * 397) ^ requirementId.GetHashCode();
             }
         }
 

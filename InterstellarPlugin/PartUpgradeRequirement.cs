@@ -5,54 +5,76 @@ using System.Text;
 
 namespace InterstellarPlugin
 {
-    public interface IPartUpgradeRequirement
+    public abstract class PartUpgradeRequirement
     {
-        void OnStart(PartUpgradeModule parent);
+        private readonly PartUpgradeModule module;
 
-        bool IsFulfilled();
+        protected PartUpgradeRequirement(PartUpgradeModule module)
+        {
+            this.module = module;
+        }
 
+        protected PartUpgradeModule Module
+        {
+            get { return module; }
+        }
+
+        public virtual void OnStart()
+        {
+        }
+
+        public abstract bool IsFulfilled();
+
+        public override string ToString()
+        {
+            return string.Format("{0} for {1}", GetType().Name, module.part.partName);
+        }
     }
 
     class PartUpgradeRequirements
     {
+        private delegate PartUpgradeRequirement RequirementFactory(PartUpgradeModule module, ConfigNode config);
+
         private const string TypeKey = "type";
-        public static IPartUpgradeRequirement CreateRequirement(ConfigNode node)
+        public static PartUpgradeRequirement CreateRequirement(PartUpgradeModule module, ConfigNode node)
         {
             var requirementType = node.GetValue(TypeKey);
-            var factory = Factories[requirementType];
+            var factory = factories[requirementType];
             if (factory == null)
                 throw new ArgumentException(string.Format("Unknown part upgrade requirement type {0}.", requirementType));
 
-            return factory.Invoke(node);
+            return factory.Invoke(module, node);
         }
 
-        private static readonly IDictionary<string, Func<ConfigNode, IPartUpgradeRequirement>> Factories =
-            new Dictionary<string, Func<ConfigNode, IPartUpgradeRequirement>>()
+        private static readonly IDictionary<string, RequirementFactory> factories =
+            new Dictionary<string, RequirementFactory>
             {
-                {"UnlockTech", n => new UnlockTech(n)}
+                {"UnlockTech", (m, n) => new UnlockTech(m, n)}
             };
 
         // TODO allow registration of external requirement types?
     }
 
-    class UnlockTech : IPartUpgradeRequirement
+    class UnlockTech : PartUpgradeRequirement
     {
         private const string TechIdKey = "tech";
 
         private readonly string techId;
         private bool fulfilled;
 
-        public UnlockTech(ConfigNode node)
+        public UnlockTech(PartUpgradeModule module, ConfigNode node)
+            : base(module)
         {
             techId = node.GetValue(TechIdKey);
         }
 
-        public void OnStart(PartUpgradeModule parent)
+        public override void OnStart()
         {
+            base.OnStart();
             fulfilled = CheckFulfilled();
         }
 
-        public bool IsFulfilled()
+        public override bool IsFulfilled()
         {
             return fulfilled;
         }
@@ -71,18 +93,17 @@ namespace InterstellarPlugin
 
         public override string ToString()
         {
-            return string.Format("Requires tech {0}", techId);
+            return string.Format("{0}, tech = {1}", base.ToString(), techId);
         }
     }
 
-    abstract class PersistentRequirement : IPartUpgradeRequirement
+    abstract class PersistentRequirement : PartUpgradeRequirement
     {
         private const string IdKey = "id";
 
-        private readonly string partName;
         private readonly string requirementId;
 
-        public bool IsFulfilled()
+        public override bool IsFulfilled()
         {
             var scenario = PartUpgradeScenario.Instance;
             return scenario != null && scenario.IsFulfilled(AsFulfilled);
@@ -102,15 +123,20 @@ namespace InterstellarPlugin
         }
 
         // TODO validate null or empty, warn
-        protected PersistentRequirement(Part part, ConfigNode node)
+        protected PersistentRequirement(PartUpgradeModule module, ConfigNode node)
+            : base(module)
         {
-            partName = part.partName;
             requirementId = node.GetValue(IdKey);
         }
 
         private FulfilledRequirement AsFulfilled
         {
-            get { return new FulfilledRequirement(partName, requirementId); }
+            get { return new FulfilledRequirement(Module.part.partName, requirementId); }
+        }
+
+        public override string ToString()
+        {
+            return base.ToString() + string.Format(", id = {0}", requirementId);
         }
     }
 
@@ -120,10 +146,11 @@ namespace InterstellarPlugin
         private int science;
 
         private BaseAction researchAction;
+        private PartUpgradeModule module;
 
         // TODO validate or move to ConfigNode.Create/Load ?
-        public OneTimeResearch(Part part, ConfigNode node)
-            : base(part, node)
+        public OneTimeResearch(PartUpgradeModule module, ConfigNode node)
+            : base(module, node)
         {
             funds = int.Parse(node.GetValue("funds") ?? "0");
             science = int.Parse(node.GetValue("science") ?? "0");
@@ -136,33 +163,42 @@ namespace InterstellarPlugin
             if (!HighLogic.LoadedSceneIsFlight)
                 return;
 
+            module = parent;
+
             // TODO Game modes
-            researchAction = new Action(parent.Actions, "research", OnAction,
+            AddUpgradeAction();
+        }
+
+        private void AddUpgradeAction()
+        {
+            researchAction = new BaseAction(module.Actions, "research", OnAction,
                 new KSPAction(String.Format("Research ({0}F, {1}S)", funds, science)));
 
-            parent.Actions.Add(researchAction);
+            module.Actions.Add(researchAction);
+        }
 
+        private void RemoveUpgradeAction()
+        {
+            module.Actions.Remove(researchAction);
         }
 
         private void OnAction(KSPActionParam param)
         {
-            if (!ResearchCosts.CanPay(funds, ResearchCosts.Type.FUNDS) ||
-                !ResearchCosts.CanPay(funds, ResearchCosts.Type.SCIENCE))
+            if (!ResearchCosts.CanPay(funds, ResearchCosts.Type.Funds) ||
+                !ResearchCosts.CanPay(funds, ResearchCosts.Type.Science))
                 return;
-            ResearchCosts.Pay(funds, ResearchCosts.Type.FUNDS);
-            ResearchCosts.Pay(science, ResearchCosts.Type.SCIENCE);
+            ResearchCosts.Pay(funds, ResearchCosts.Type.Funds);
+            ResearchCosts.Pay(science, ResearchCosts.Type.Science);
 
             Fulfill();
-            // TODO
-            // parent.IsUpgraded = true;
+
+            RemoveUpgradeAction();
+            Module.IsUpgraded = true;
         }
 
-        class Action : BaseAction
+        public override string ToString()
         {
-            public Action(BaseActionList listParent, string name, BaseActionDelegate onEvent, KSPAction actionAttr)
-                : base(listParent, name, onEvent, actionAttr)
-            {
-            }
+            return base.ToString() + string.Format(", funds = {0}, science = {1}", funds, science);
         }
     }
 
@@ -171,17 +207,17 @@ namespace InterstellarPlugin
     {
         internal enum Type
         {
-            FUNDS,
-            SCIENCE
+            Funds,
+            Science
         }
 
         internal static bool CanPay(int amount, Type type)
         {
             switch (type)
             {
-                case Type.FUNDS:
+                case Type.Funds:
                     return CanPayFunds(amount);
-                case Type.SCIENCE:
+                case Type.Science:
                     return CanPayScience(amount);
                 default:
                     throw new ArgumentException("Unknown cost type " + type);
@@ -192,10 +228,10 @@ namespace InterstellarPlugin
         {
             switch (type)
             {
-                case Type.FUNDS:
+                case Type.Funds:
                     PayFunds(amount);
                     break;
-                case Type.SCIENCE:
+                case Type.Science:
                     PayScience(amount);
                     break;
                 default:
