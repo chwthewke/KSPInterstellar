@@ -10,8 +10,9 @@ namespace InterstellarPlugin
     public class PartUpgradeModule : PartModule
     {
         public const string RequirementsNode = "REQUIREMENT";
+        public const string UpgradeNode = "UPGRADE";
 
-        [KSPField(isPersistant = true)]
+        [KSPField(isPersistant = true)] 
         private bool isUpgraded;
 
         public bool IsUpgraded
@@ -26,6 +27,7 @@ namespace InterstellarPlugin
 
         private readonly IList<PartUpgradeRequirement> requirements = new List<PartUpgradeRequirement>();
 
+        private readonly IList<PartUpgrade> upgrades = new List<PartUpgrade>();
 
 
         public override void OnLoad(ConfigNode node)
@@ -37,9 +39,18 @@ namespace InterstellarPlugin
                 requirements.Add(PartUpgradeRequirements.CreateRequirement(this, requirementNode));
             }
 
+            foreach (var upgradeNode in node.GetNodes(UpgradeNode))
+            {
+                upgrades.Add(new PartUpgrade(upgradeNode));
+            }
+
 #if DEBUG
-            Debug.Log(string.Format("PartUpgradeModule for {0} loaded with requirements {1}, isUpgraded = {2}.",
-                part.partName, string.Join(", ", requirements.Select(r => r.ToString()).ToArray()), isUpgraded));
+            Debug.Log(string.Format("PartUpgradeModule for {0} loaded with requirements [ {1} ] " +
+                                    "and upgrades [ {2} ], isUpgraded = {3}.",
+                part.partName,
+                string.Join(", ", requirements.Select(r => r.ToString()).ToArray()),
+                string.Join(", ", upgrades.Select(u => u.ToString()).ToArray()),
+                isUpgraded));
 #endif
         }
 
@@ -56,33 +67,87 @@ namespace InterstellarPlugin
 
         public void CheckRequirements()
         {
-            if (requirements.All(r => r.IsFulfilled()))
-                IsUpgraded = true;
+            IsUpgraded = requirements.All(r => r.IsFulfilled());
         }
 
-        private void UpgradePart()
+        internal void UpgradePart()
         {
             if (!IsUpgraded)
                 return;
 #if DEBUG
             Debug.Log(string.Format("Upgrade part {0}.", part.partName));
 #endif
+
+            foreach (var partUpgrade in upgrades)
+            {
+                UpgradeModule(partUpgrade);
+            }
         }
 
-
-        public class TweakScaleUpdater : IRescalable<PartUpgradeModule>
+        private void UpgradeModule(PartUpgrade partUpgrade)
         {
-            public TweakScaleUpdater(PartUpgradeModule module)
+            foreach (var module in part.Modules
+                .OfType<PartModule>())
             {
-                this.module = module;
+                partUpgrade.UpgradeModule(module);
             }
+        }
+    }
 
-            public void OnRescale(ScalingFactor factor)
+    public class TweakScaleUpdater : IRescalable<PartUpgradeModule>
+    {
+        public TweakScaleUpdater(PartUpgradeModule module)
+        {
+            this.module = module;
+        }
+
+        public void OnRescale(ScalingFactor factor)
+        {
+            module.UpgradePart();
+        }
+
+        private readonly PartUpgradeModule module;
+    }
+
+    public class PartUpgrade
+    {
+        private const string ModuleKey = "module";
+
+        private readonly string module;
+        private readonly IDictionary<string, string> upgradeValues = new Dictionary<string, string>();
+
+        public string Module
+        {
+            get { return module; }
+        }
+
+        public PartUpgrade(ConfigNode node)
+        {
+            module = node.GetValue(ModuleKey);
+
+            foreach (var value in node.values.OfType<ConfigNode.Value>())
             {
-                module.UpgradePart();
+                if (value.name == ModuleKey)
+                    continue;
+                upgradeValues[value.name] = value.value;
             }
+        }
 
-            private readonly PartUpgradeModule module;
+        public void UpgradeModule(PartModule module)
+        {
+            if (module.moduleName != this.module)
+                return;
+            foreach (var field in upgradeValues.Keys)
+            {
+                module.Fields.ReadValue(field, upgradeValues[field]);
+            }
+        }
+
+        public override string ToString()
+        {
+            return string.Format("PartUpgrade of {0}: [ {1} ]",
+                module,
+                string.Join(", ", upgradeValues.Select(kv => string.Format("{0} = {1}", kv.Key, kv.Value)).ToArray()));
         }
     }
 }

@@ -30,27 +30,6 @@ namespace InterstellarPlugin
             instance = this;
         }
 
-
-        // TODO obsolete
-        private static PartUpgradeScenario GetOrCreateScenario(Game game)
-        {
-            if (game == null)
-                return null;
-
-            var scenario = game.scenarios.Select(s => s.moduleRef).OfType<PartUpgradeScenario>().FirstOrDefault();
-            if (scenario != null)
-                return scenario;
-
-            ProtoScenarioModule protoModule =
-                game.AddProtoScenarioModule(typeof(PartUpgradeScenario),
-                    GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.SPH);
-
-            if (protoModule.targetScenes.Contains(HighLogic.LoadedScene))
-                return (PartUpgradeScenario)protoModule.Load(ScenarioRunner.fetch);
-
-            return null;
-        }
-
         public void FulfillRequirement(FulfilledRequirement requirement)
         {
             fulfilledRequirements.Add(requirement);
@@ -93,6 +72,9 @@ namespace InterstellarPlugin
     {
         private const string PartKey = "part";
         private const string IdKey = "id";
+
+        private readonly string partName;
+        private readonly string requirementId;
 
         public FulfilledRequirement(string partName, string requirementId)
         {
@@ -152,7 +134,5 @@ namespace InterstellarPlugin
             return string.Format("Requirement {0} for part {1}", requirementId, partName);
         }
 
-        private readonly string partName;
-        private readonly string requirementId;
     }
 }
