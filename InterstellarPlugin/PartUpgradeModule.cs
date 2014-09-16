@@ -45,7 +45,7 @@ namespace InterstellarPlugin
             }
 
 #if DEBUG
-            Debug.Log(string.Format("PartUpgradeModule for {0} loaded with requirements [ {1} ] " +
+            Debug.Log(string.Format("[Interstellar] PartUpgradeModule for {0} loaded with requirements [ {1} ] " +
                                     "and upgrades [ {2} ], isUpgraded = {3}.",
                 part.partName,
                 string.Join(", ", requirements.Select(r => r.ToString()).ToArray()),
@@ -67,7 +67,16 @@ namespace InterstellarPlugin
 
         public void CheckRequirements()
         {
-            IsUpgraded = requirements.All(r => r.IsFulfilled());
+            IsUpgraded = requirements.All(CheckRequirement);
+        }
+
+        private bool CheckRequirement(PartUpgradeRequirement requirement)
+        {
+            bool fulfilled = requirement.IsFulfilled();
+#if DEBUG
+            Debug.Log(string.Format("[Interstellar] Upgrade Requirement {0}: {1}", requirement, fulfilled));
+#endif
+            return fulfilled;
         }
 
         internal void UpgradePart()
@@ -75,7 +84,7 @@ namespace InterstellarPlugin
             if (!IsUpgraded)
                 return;
 #if DEBUG
-            Debug.Log(string.Format("Upgrade part {0}.", part.partName));
+            Debug.Log(string.Format("[Interstellar] Upgrade part {0}.", part));
 #endif
 
             foreach (var partUpgrade in upgrades)
@@ -103,12 +112,17 @@ namespace InterstellarPlugin
 
         public void OnRescale(ScalingFactor factor)
         {
+#if DEBUG
+            Debug.Log(string.Format("[Interstellar] OnRescale, factor.absolute = {0}, factor.relative = {1}",
+                factor.absolute.linear, factor.relative.linear));
+#endif
             module.UpgradePart();
         }
 
         private readonly PartUpgradeModule module;
     }
 
+    // TODO add exponent (if possible: default from original module, overridable)
     public class PartUpgrade
     {
         private const string ModuleKey = "module";

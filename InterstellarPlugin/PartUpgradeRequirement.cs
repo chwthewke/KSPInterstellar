@@ -35,7 +35,7 @@ namespace InterstellarPlugin
     {
         private delegate PartUpgradeRequirement RequirementFactory(PartUpgradeModule module, ConfigNode config);
 
-        private const string TypeKey = "type";
+        private const string TypeKey = "name";
         public static PartUpgradeRequirement CreateRequirement(PartUpgradeModule module, ConfigNode node)
         {
             var requirementType = node.GetValue(TypeKey);
@@ -57,7 +57,7 @@ namespace InterstellarPlugin
 
     class UnlockTech : PartUpgradeRequirement
     {
-        private const string TechIdKey = "tech";
+        private const string TechIdKey = "techID";
 
         private readonly string techId;
         private bool fulfilled;

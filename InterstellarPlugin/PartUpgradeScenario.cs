@@ -62,7 +62,7 @@ namespace InterstellarPlugin
             }
 
 #if DEBUG
-            Debug.Log("PartUpgradeScenario loaded with fulfilled requirements: " +
+            Debug.Log("[Interstellar] PartUpgradeScenario loaded with fulfilled requirements: " +
             string.Join(", ", fulfilledRequirements.Select(r => r.ToString()).ToArray()));
 #endif
         }
