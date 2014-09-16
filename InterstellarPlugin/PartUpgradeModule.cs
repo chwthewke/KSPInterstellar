@@ -67,6 +67,10 @@ namespace InterstellarPlugin
 
         public void CheckRequirements()
         {
+#if DEBUG
+            Debug.Log(string.Format("[Interstellar] CheckRequirements {0}",
+                string.Join(", ", requirements.Select(r => r.ToString()).ToArray())));
+#endif
             IsUpgraded = requirements.All(CheckRequirement);
         }
 
