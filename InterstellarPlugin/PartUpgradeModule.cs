@@ -12,8 +12,11 @@ namespace InterstellarPlugin
         public const string RequirementsNode = "REQUIREMENT";
         public const string UpgradeNode = "UPGRADE";
 
-        [KSPField(isPersistant = true)] 
-        private bool isUpgraded;
+        [KSPField(isPersistant = true)]
+        public bool isUpgraded;
+
+        [KSPField(isPersistant = false)]
+        public string uid;
 
         public bool IsUpgraded
         {
@@ -25,38 +28,53 @@ namespace InterstellarPlugin
             }
         }
 
-        private readonly IList<PartUpgradeRequirement> requirements = new List<PartUpgradeRequirement>();
+        private List<PartUpgradeRequirement> requirements;
 
-        private readonly IList<PartUpgrade> upgrades = new List<PartUpgrade>();
+        private List<PartUpgrade> upgrades;
 
+        private static readonly IDictionary<string, PartUpgradeModule> loadedUpgradeModules =
+            new Dictionary<string, PartUpgradeModule>();
 
         public override void OnLoad(ConfigNode node)
         {
             base.OnLoad(node);
 
-            foreach (var requirementNode in node.GetNodes(RequirementsNode))
-            {
-                requirements.Add(PartUpgradeRequirements.CreateRequirement(this, requirementNode));
-            }
+            requirements = node.GetNodes(RequirementsNode)
+                .Select(n => PartUpgradeRequirements.CreateRequirement(this, n))
+                .ToList();
 
-            foreach (var upgradeNode in node.GetNodes(UpgradeNode))
-            {
-                upgrades.Add(new PartUpgrade(upgradeNode));
-            }
+            upgrades = node.GetNodes(UpgradeNode)
+                .Select(n => new PartUpgrade(n))
+                .ToList();
+
+            uid = Guid.NewGuid().ToString();
+            loadedUpgradeModules[uid] = this;
 
 #if DEBUG
-            Debug.Log(string.Format("[Interstellar] PartUpgradeModule for {0} loaded with requirements [ {1} ] " +
-                                    "and upgrades [ {2} ], isUpgraded = {3}.",
-                part.partName,
+            Debug.Log("[Interstellar] Loaded " + this);
+#endif
+        }
+
+        public override string ToString()
+        {
+            return string.Format("PartUpgradeModule for {0}, requirements [ {1} ], upgrades [ {2} ], isUpgraded = {3}, uid = {4}.",
+                part.name,
                 string.Join(", ", requirements.Select(r => r.ToString()).ToArray()),
                 string.Join(", ", upgrades.Select(u => u.ToString()).ToArray()),
-                isUpgraded));
-#endif
+                isUpgraded,
+                uid);
         }
 
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
+
+            requirements = loadedUpgradeModules[uid].requirements;
+            upgrades = loadedUpgradeModules[uid].upgrades;
+
+#if DEBUG
+            Debug.Log("[Interstellar] OnStart " + this);
+#endif
 
             foreach (var requirement in requirements)
                 requirement.OnStart();
@@ -143,10 +161,8 @@ namespace InterstellarPlugin
         {
             module = node.GetValue(ModuleKey);
 
-            foreach (var value in node.values.OfType<ConfigNode.Value>())
+            foreach (var value in node.values.OfType<ConfigNode.Value>().Where(value => value.name != ModuleKey))
             {
-                if (value.name == ModuleKey)
-                    continue;
                 upgradeValues[value.name] = value.value;
             }
         }

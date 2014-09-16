@@ -35,13 +35,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\KSPLibs\0.24\Assembly-CSharp.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>..\..\KSPLibs\0.24.2\Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="UnityEngine">
-      <HintPath>..\..\KSPLibs\0.24\UnityEngine.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>..\..\KSPLibs\0.24.2\UnityEngine.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

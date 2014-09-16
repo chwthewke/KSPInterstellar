@@ -60,7 +60,6 @@ namespace InterstellarPlugin
         private const string TechIdKey = "techID";
 
         private readonly string techId;
-        private bool fulfilled;
 
         public UnlockTech(PartUpgradeModule module, ConfigNode node)
             : base(module)
@@ -68,18 +67,7 @@ namespace InterstellarPlugin
             techId = node.GetValue(TechIdKey);
         }
 
-        public override void OnStart()
-        {
-            base.OnStart();
-            fulfilled = CheckFulfilled();
-        }
-
         public override bool IsFulfilled()
-        {
-            return fulfilled;
-        }
-
-        private bool CheckFulfilled()
         {
             Game currentGame = HighLogic.CurrentGame;
             if (currentGame == null)
