@@ -2,35 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using UnityEngine;
 
 namespace InterstellarPlugin
 {
-    public abstract class PartUpgradeRequirement
-    {
-        private readonly PartUpgradeModule module;
-
-        protected PartUpgradeRequirement(PartUpgradeModule module)
-        {
-            this.module = module;
-        }
-
-        protected PartUpgradeModule Module
-        {
-            get { return module; }
-        }
-
-        public virtual void OnStart()
-        {
-        }
-
-        public abstract bool IsFulfilled();
-
-        public override string ToString()
-        {
-            return string.Format("{0} for {1}", GetType().Name, module.part.partName);
-        }
-    }
-
     class PartUpgradeRequirements
     {
         private delegate PartUpgradeRequirement RequirementFactory(PartUpgradeModule module, ConfigNode config);
@@ -49,20 +24,52 @@ namespace InterstellarPlugin
         private static readonly IDictionary<string, RequirementFactory> factories =
             new Dictionary<string, RequirementFactory>
             {
-                {"UnlockTech", (m, n) => new UnlockTech(m, n)}
+                {"UnlockTech", (m, n) => new UnlockTech(n)}
             };
 
         // TODO allow registration of external requirement types?
     }
 
+    public abstract class PartUpgradeRequirement
+    {
+        private PartUpgradeModule module;
+
+        protected PartUpgradeModule Module
+        {
+            get { return module; }
+        }
+
+        internal void Start(PartUpgradeModule upgradeModule)
+        {
+            module = upgradeModule;
+            OnStart();
+        }
+
+        public virtual void OnStart()
+        {
+        }
+
+        public abstract bool IsFulfilled();
+
+        public override string ToString()
+        {
+            var moduleDesc = module == null ? "[unknown]" : module.part.partName;
+            return string.Format("{0} for {1}", GetType().Name, moduleDesc);
+        }
+    }
+
+    [Serializable]
     class UnlockTech : PartUpgradeRequirement
     {
         private const string TechIdKey = "techID";
 
-        private readonly string techId;
+        [SerializeField]
+        public string techId;
 
-        public UnlockTech(PartUpgradeModule module, ConfigNode node)
-            : base(module)
+        public UnlockTech() { }
+
+        public UnlockTech(ConfigNode node)
+            : this()
         {
             techId = node.GetValue(TechIdKey);
         }
@@ -89,15 +96,14 @@ namespace InterstellarPlugin
     {
         private const string IdKey = "id";
 
-        private readonly string requirementId;
+        [SerializeField]
+        public string requirementId;
 
         public override bool IsFulfilled()
         {
             var scenario = PartUpgradeScenario.Instance;
             return scenario != null && scenario.IsFulfilled(AsFulfilled);
         }
-
-        public abstract void OnStart(PartUpgradeModule parent);
 
         public bool Fulfill()
         {
@@ -110,9 +116,11 @@ namespace InterstellarPlugin
             return true;
         }
 
+        protected PersistentRequirement() { }
+
         // TODO validate null or empty, warn
-        protected PersistentRequirement(PartUpgradeModule module, ConfigNode node)
-            : base(module)
+        protected PersistentRequirement(ConfigNode node)
+            : this()
         {
             requirementId = node.GetValue(IdKey);
         }
@@ -128,30 +136,31 @@ namespace InterstellarPlugin
         }
     }
 
+    [Serializable]
     class OneTimeResearch : PersistentRequirement
     {
-        private int funds;
-        private int science;
+        [SerializeField]
+        public int funds;
+        [SerializeField]
+        public int science;
 
         private BaseAction researchAction;
-        private PartUpgradeModule module;
+
+        public OneTimeResearch() { }
 
         // TODO validate or move to ConfigNode.Create/Load ?
-        public OneTimeResearch(PartUpgradeModule module, ConfigNode node)
-            : base(module, node)
+        public OneTimeResearch(ConfigNode node): base(node)
         {
             funds = int.Parse(node.GetValue("funds") ?? "0");
             science = int.Parse(node.GetValue("science") ?? "0");
         }
 
-        public override void OnStart(PartUpgradeModule parent)
+        public override void OnStart()
         {
             if (IsFulfilled())
                 return;
             if (!HighLogic.LoadedSceneIsFlight)
                 return;
-
-            module = parent;
 
             // TODO Game modes
             AddUpgradeAction();
@@ -159,15 +168,15 @@ namespace InterstellarPlugin
 
         private void AddUpgradeAction()
         {
-            researchAction = new BaseAction(module.Actions, "research", OnAction,
+            researchAction = new BaseAction(Module.Actions, "research", OnAction,
                 new KSPAction(String.Format("Research ({0}F, {1}S)", funds, science)));
 
-            module.Actions.Add(researchAction);
+            Module.Actions.Add(researchAction);
         }
 
         private void RemoveUpgradeAction()
         {
-            module.Actions.Remove(researchAction);
+            Module.Actions.Remove(researchAction);
         }
 
         private void OnAction(KSPActionParam param)
@@ -181,6 +190,8 @@ namespace InterstellarPlugin
             Fulfill();
 
             RemoveUpgradeAction();
+
+            // TODO change to event on PartUpgradeScenario
             Module.IsUpgraded = true;
         }
 

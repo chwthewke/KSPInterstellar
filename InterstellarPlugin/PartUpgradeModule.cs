@@ -12,13 +12,6 @@ namespace InterstellarPlugin
         public const string RequirementsNode = "REQUIREMENT";
         public const string UpgradeNode = "UPGRADE";
 
-        [KSPField(isPersistant = true)]
-        public bool isUpgraded;
-
-        [KSPField(isPersistant = false)]
-        [SerializeField]
-        public string uid;
-
         public bool IsUpgraded
         {
             get { return isUpgraded; }
@@ -29,9 +22,14 @@ namespace InterstellarPlugin
             }
         }
 
-        private List<PartUpgradeRequirement> requirements;
+        [KSPField(isPersistant = true)]
+        public bool isUpgraded;
 
-        private List<PartUpgrade> upgrades;
+        [SerializeField]
+        public List<PartUpgradeRequirement> requirements;
+
+        [SerializeField]
+        public List<PartUpgrade> upgrades;
 
         private static readonly IDictionary<string, PartUpgradeModule> loadedUpgradeModules =
             new Dictionary<string, PartUpgradeModule>();
@@ -48,9 +46,6 @@ namespace InterstellarPlugin
                 .Select(n => new PartUpgrade(n))
                 .ToList();
 
-            uid = Guid.NewGuid().ToString();
-            loadedUpgradeModules[uid] = this;
-
 #if DEBUG
             Debug.Log("[Interstellar] Loaded " + this);
 #endif
@@ -58,27 +53,23 @@ namespace InterstellarPlugin
 
         public override string ToString()
         {
-            return string.Format("PartUpgradeModule for {0}, requirements [ {1} ], upgrades [ {2} ], isUpgraded = {3}, uid = {4}.",
+            return string.Format("PartUpgradeModule for {0}, requirements [ {1} ], upgrades [ {2} ], isUpgraded = {3}.",
                 part.name,
-                string.Join(", ", requirements.Select(r => r.ToString()).ToArray()),
-                string.Join(", ", upgrades.Select(u => u.ToString()).ToArray()),
-                isUpgraded,
-                uid);
+                string.Join(", ", requirements == null ? new[] { "null" } : requirements.Select(r => r.ToString()).ToArray()),
+                string.Join(", ", upgrades == null ? new[] { "null" } : upgrades.Select(u => u.ToString()).ToArray()),
+                isUpgraded);
         }
 
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
 
-            requirements = loadedUpgradeModules[uid].requirements;
-            upgrades = loadedUpgradeModules[uid].upgrades;
-
 #if DEBUG
             Debug.Log("[Interstellar] OnStart " + this);
 #endif
 
             foreach (var requirement in requirements)
-                requirement.OnStart();
+                requirement.Start(this);
 
             if (state == StartState.Editor)
                 CheckRequirements();
@@ -146,25 +137,34 @@ namespace InterstellarPlugin
     }
 
     // TODO add exponent (if possible: default from original module, overridable)
+    [Serializable]
     public class PartUpgrade
     {
         private const string ModuleKey = "module";
 
-        private readonly string module;
-        private readonly IDictionary<string, string> upgradeValues = new Dictionary<string, string>();
+        [SerializeField]
+        public string module;
+
+        [SerializeField]
+        public List<PartUpgradeValue> upgradeValues = new List<PartUpgradeValue>();
 
         public string Module
         {
             get { return module; }
         }
 
+        public PartUpgrade()
+        {
+        }
+
         public PartUpgrade(ConfigNode node)
+            : this()
         {
             module = node.GetValue(ModuleKey);
 
             foreach (var value in node.values.OfType<ConfigNode.Value>().Where(value => value.name != ModuleKey))
             {
-                upgradeValues[value.name] = value.value;
+                upgradeValues.Add(new PartUpgradeValue(value.name, value.value));
             }
         }
 
@@ -172,9 +172,9 @@ namespace InterstellarPlugin
         {
             if (module.moduleName != this.module)
                 return;
-            foreach (var field in upgradeValues.Keys)
+            foreach (var field in upgradeValues)
             {
-                module.Fields.ReadValue(field, upgradeValues[field]);
+                module.Fields.ReadValue(field.name, field.value);
             }
         }
 
@@ -182,7 +182,22 @@ namespace InterstellarPlugin
         {
             return string.Format("PartUpgrade of {0}: [ {1} ]",
                 module,
-                string.Join(", ", upgradeValues.Select(kv => string.Format("{0} = {1}", kv.Key, kv.Value)).ToArray()));
+                string.Join(", ", upgradeValues.Select(uv => string.Format("{0} = {1}", uv.name, uv.value)).ToArray()));
+        }
+
+        [Serializable]
+        public struct PartUpgradeValue
+        {
+            [SerializeField]
+            public string name;
+            [SerializeField]
+            public string value;
+
+            public PartUpgradeValue(string name, string value)
+            {
+                this.name = name;
+                this.value = value;
+            }
         }
     }
 }
