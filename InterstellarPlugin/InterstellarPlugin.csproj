@@ -35,8 +35,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\KSPLibs\0.24\Assembly-CSharp.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>..\..\KSPLibs\0.24.2\Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="OpenResourceSystem_1_2_1">
       <HintPath>..\..\KSPLibs\ORS\OpenResourceSystem_1_2_1.dll</HintPath>
@@ -48,8 +47,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="UnityEngine">
-      <HintPath>..\..\KSPLibs\0.24\UnityEngine.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>..\..\KSPLibs\0.24.2\UnityEngine.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
