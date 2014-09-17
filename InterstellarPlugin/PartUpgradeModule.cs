@@ -16,6 +16,7 @@ namespace InterstellarPlugin
         public bool isUpgraded;
 
         [KSPField(isPersistant = false)]
+        [SerializeField]
         public string uid;
 
         public bool IsUpgraded

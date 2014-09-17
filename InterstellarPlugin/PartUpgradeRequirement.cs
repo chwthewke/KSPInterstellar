@@ -76,7 +76,7 @@ namespace InterstellarPlugin
             if (currentGame.Mode != Game.Modes.CAREER && currentGame.Mode != Game.Modes.SCIENCE_SANDBOX)
                 return true;
 
-            return ResearchAndDevelopment.Instance.GetTechState(techId).state == RDTech.State.Available;
+            return ResearchAndDevelopment.Instance.GetTechState(techId) != null;
         }
 
         public override string ToString()
