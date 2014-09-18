@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace InterstellarPlugin
 {
-    [KSPScenario(ScenarioCreationOptions.AddToAllGames, GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.FLIGHT)]
+    [KSPScenario(ScenarioCreationOptions.AddToAllGames, GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.SPH)]
     public class PartUpgradeScenario : ScenarioModule
     {
         public const string ScenarioName = "KspilPartUpgrades";
