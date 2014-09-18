@@ -37,7 +37,7 @@ namespace InterstellarPlugin.PartUpgrades
         private UpgradeModule module;
     }
 
-    class UnlockTech : PartUpgradeRequirement
+    class UnlockTech : UpgradeRequirement
     {
         [KSPField]
         public string techID;

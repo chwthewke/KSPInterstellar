@@ -39,7 +39,7 @@ namespace InterstellarPlugin.PartUpgrades
                 {
                     Debug.LogWarning(
                         string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                            GetType().Name, part.partInfo.partPrefab.name, UpgradeKey, index, error));
+                            GetType().Name, part.name, UpgradeKey, index, error));
                 }
             }
 
@@ -55,7 +55,7 @@ namespace InterstellarPlugin.PartUpgrades
                 {
                     Debug.LogWarning(
                         string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                            GetType().Name, part.partInfo.partPrefab.name, RequirementKey, index, error));
+                            GetType().Name, part.name, RequirementKey, index, error));
                 }
             }
 
@@ -75,7 +75,7 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override string ToString()
         {
-            return string.Format("{0} for {1}: upgrades = [{2}], requirements = [{3}], config = <{4}>", 
+            return string.Format("{0} for {1}: upgrades = [{2}], requirements = [{3}], config = <{4}>",
                 GetType(), part.name,
                 upgrades == null ? "null" : string.Join(", ", upgrades.Select(o => o.ToString()).ToArray()),
                 requirements == null ? "null" : string.Join(", ", requirements.Select(o => o.ToString()).ToArray()),
@@ -123,7 +123,7 @@ namespace InterstellarPlugin.PartUpgrades
                     return string.Format("The value {0} cannot be parsed as {1}:{2}",
                         value, target, fieldType.Name);
             }
-                // The source field must be found and its type must agree with the target's type.
+            // The source field must be found and its type must agree with the target's type.
             else
             {
                 var sourceField = FindField(partModule, source);
@@ -133,7 +133,7 @@ namespace InterstellarPlugin.PartUpgrades
 
                 Type sourceType = sourceField.FieldInfo.FieldType;
                 bool compatible = sourceType == targetType ||
-                                  (targetType == typeof (float) && sourceType == typeof (int));
+                                  (targetType == typeof(float) && sourceType == typeof(int));
                 if (!compatible)
                     return string.Format("source {0}: {1} is not compatible with target type {2}: {3}",
                         source, sourceType.Name, target, targetType.Name);
@@ -163,13 +163,16 @@ namespace InterstellarPlugin.PartUpgrades
                 .SelectMany(a => a.GetTypes())
                 .FirstOrDefault(t => t.Name == requirementName);
 
-            var @object = ConfigNode.CreateObjectFromConfig(node);
+            if (type == null)
+                return "Cound not find a type named " + requirementName; 
+
+            var @object = ConfigNode.CreateObjectFromConfig(type.AssemblyQualifiedName, node);
             if (@object == null)
-                return string.Format("Could not create object {0}", requirementName);
+                return string.Format("Could not create object {0}", type.Name);
             var requirement = @object as UpgradeRequirement;
             if (requirement == null)
                 return string.Format("Upgrade requirement type {0} is not an {1}",
-                    @object.GetType().Name, typeof (UpgradeRequirement).Name);
+                    @object.GetType().AssemblyQualifiedName, typeof(UpgradeRequirement).Name);
             return requirement.Validate(part);
         }
 
