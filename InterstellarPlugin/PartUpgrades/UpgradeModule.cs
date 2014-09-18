@@ -8,11 +8,12 @@ namespace InterstellarPlugin.PartUpgrades
     public class UpgradeModule : PartModule
     {
         public const string UpgradeKey = "UPGRADE";
-        public const string RequirementKey = "REQUIREMENT";
         public const string ModuleKey = "module";
         public const string TargetKey = "target";
         public const string ValueKey = "value";
         public const string SourceKey = "source";
+        public const string RequirementKey = "REQUIREMENT";
+        public const string NameKey = "name";
 
         [KSPField(isPersistant = false)]
         public ConfigNode Config;
@@ -38,7 +39,7 @@ namespace InterstellarPlugin.PartUpgrades
                 {
                     Debug.LogWarning(
                         string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                            GetType().Name, part.name, UpgradeKey, index, error));
+                            GetType().Name, part.partInfo.partPrefab.name, UpgradeKey, index, error));
                 }
             }
 
@@ -54,7 +55,7 @@ namespace InterstellarPlugin.PartUpgrades
                 {
                     Debug.LogWarning(
                         string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                            GetType().Name, part.name, RequirementKey, index, error));
+                            GetType().Name, part.partInfo.partPrefab.name, RequirementKey, index, error));
                 }
             }
 
@@ -65,8 +66,8 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override void OnStart(StartState state)
         {
-//            upgrades = Config.GetNodes(UpgradeKey).Select(LoadUpgrade).ToList();
-//            requirements = Config.GetNodes(RequirementKey).Select(LoadRequirement).ToList();
+            upgrades = Config.GetNodes(UpgradeKey).Select(LoadUpgrade).ToList();
+            requirements = Config.GetNodes(RequirementKey).Select(LoadRequirement).ToList();
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Started {0}.", this));
 #endif
@@ -119,7 +120,7 @@ namespace InterstellarPlugin.PartUpgrades
                 object valueObj;
                 Type fieldType = targetType;
                 if (!FieldParser.TryParse(fieldType, value, out valueObj))
-                    return string.Format("The value {0} of {1} could not be parsed as a(n) {2}",
+                    return string.Format("The value {0} cannot be parsed as {1}:{2}",
                         value, target, fieldType.Name);
             }
                 // The source field must be found and its type must agree with the target's type.
@@ -127,15 +128,15 @@ namespace InterstellarPlugin.PartUpgrades
             {
                 var sourceField = FindField(partModule, source);
                 if (sourceField == null)
-                    return string.Format("Neither module {0} nor this module have a field named {1}",
+                    return string.Format("Module {0} has no field named {1}",
                         module, source);
 
                 Type sourceType = sourceField.FieldInfo.FieldType;
                 bool compatible = sourceType == targetType ||
                                   (targetType == typeof (float) && sourceType == typeof (int));
                 if (!compatible)
-                    return string.Format("source type {0} is not compatible with target type {1}",
-                        sourceType.Name, targetType.Name);
+                    return string.Format("source {0}: {1} is not compatible with target type {2}: {3}",
+                        source, sourceType.Name, target, targetType.Name);
             }
 
             return null;
@@ -144,7 +145,7 @@ namespace InterstellarPlugin.PartUpgrades
         private Upgrade LoadUpgrade(ConfigNode node)
         {
             var module = node.GetValue(ModuleKey);
-            var targetModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.name == module);
+            var targetModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.moduleName == module);
             var targetField = FindField(targetModule, node.GetValue(TargetKey));
             string source = node.GetValue(SourceKey);
             if (source != null)
@@ -157,9 +158,14 @@ namespace InterstellarPlugin.PartUpgrades
 
         private string ValidateRequirement(ConfigNode node)
         {
+            var requirementName = node.GetValue(NameKey);
+            var type = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => a.GetTypes())
+                .FirstOrDefault(t => t.Name == requirementName);
+
             var @object = ConfigNode.CreateObjectFromConfig(node);
             if (@object == null)
-                return string.Format("Could not create object {0}", node.GetValue(name));
+                return string.Format("Could not create object {0}", requirementName);
             var requirement = @object as UpgradeRequirement;
             if (requirement == null)
                 return string.Format("Upgrade requirement type {0} is not an {1}",
