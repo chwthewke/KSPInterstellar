@@ -71,6 +71,26 @@ namespace InterstellarPlugin.PartUpgrades
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Started {0}.", this));
 #endif
+            
+        }
+
+        public void CheckRequirements()
+        {
+            IsUnlocked = requirements.All(req => req.IsFulfilled());
+
+            UpdateUpgrades();
+        }
+
+        public void UpdateUpgrades()
+        {
+            if (IsUnlocked)
+                UpgradePart();
+        }
+
+        private void UpgradePart()
+        {
+            foreach (var upgrade in upgrades)
+                upgrade.Apply();
         }
 
         public override string ToString()

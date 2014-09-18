@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace InterstellarPlugin.PartUpgrades
 {
@@ -36,15 +37,16 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override string ToString()
         {
-            var moduleDesc = module == null ? "[unknown]" : 
-                string.Format("{0}/{1}", module.part.OriginalName(), module.name);
-            return string.Format("{0} of {1}", typeof(UpgradeRequirement).Name, moduleDesc);
+            var moduleDesc = module == null
+                ? "[unknown]"
+                : string.Format("{0}/{1}", module.part.OriginalName(), module.name);
+            return string.Format("{0} of {1}", typeof (UpgradeRequirement).Name, moduleDesc);
         }
 
         private UpgradeModule module;
     }
 
-    class UnlockTech : UpgradeRequirement
+    internal class UnlockTech : UpgradeRequirement
     {
         [KSPField]
         public string techID;
@@ -67,7 +69,7 @@ namespace InterstellarPlugin.PartUpgrades
         }
     }
 
-    abstract class PersistentRequirement : UpgradeRequirement
+    internal abstract class PersistentRequirement : UpgradeRequirement
     {
         public override bool IsFulfilled()
         {
@@ -97,18 +99,16 @@ namespace InterstellarPlugin.PartUpgrades
         }
     }
 
-    class OneTimeResearch : PersistentRequirement
+    internal class OneTimeResearch : PersistentRequirement
     {
         [KSPField]
         public int funds;
+
         [KSPField]
         public int science;
 
         private BaseAction researchAction;
-
-        public OneTimeResearch()
-        {
-        }
+        private List<IResearchCost> costs;
 
         public override void OnStart()
         {
@@ -117,14 +117,19 @@ namespace InterstellarPlugin.PartUpgrades
             if (!HighLogic.LoadedSceneIsFlight)
                 return;
 
-            // TODO Game modes
+            InitCosts();
             AddUpgradeAction();
+        }
+
+        private void InitCosts()
+        {
+            costs = new List<IResearchCost> {FundsCost.Of(funds), ScienceCost.Of(science)};
         }
 
         private void AddUpgradeAction()
         {
-            researchAction = new BaseAction(Module.Actions, "research", OnAction,
-                new KSPAction(String.Format("Research ({0}F, {1}S)", funds, science)));
+            var costStr = "Research upgrade " + string.Join(", ", costs.Select(c => c.GuiText).ToArray());
+            researchAction = new BaseAction(Module.Actions, "research", OnAction, new KSPAction(costStr));
 
             Module.Actions.Add(researchAction);
         }
@@ -136,18 +141,21 @@ namespace InterstellarPlugin.PartUpgrades
 
         private void OnAction(KSPActionParam param)
         {
-            if (!ResearchCosts.CanPay(funds, ResearchCosts.Type.Funds) ||
-                !ResearchCosts.CanPay(funds, ResearchCosts.Type.Science))
+            var canPay = costs.Aggregate(true, (b, c) => b && c.CanPay());
+            if (!canPay)
+            {
+                ScreenMessages.PostScreenMessage("Cannot research upgrade", 3.0f);
                 return;
-            ResearchCosts.Pay(funds, ResearchCosts.Type.Funds);
-            ResearchCosts.Pay(science, ResearchCosts.Type.Science);
+            }
 
-            Fulfill();
+            foreach (var cost in costs)
+                cost.Pay();
+
 
             RemoveUpgradeAction();
 
-            // TODO change to event on PartUpgradeScenario
-            //Module.IsUpgraded = true;
+            Fulfill();
+            Module.CheckRequirements();
         }
 
         public override string ToString()
@@ -155,74 +163,4 @@ namespace InterstellarPlugin.PartUpgrades
             return base.ToString() + string.Format(", funds = {0}, science = {1}", funds, science);
         }
     }
-
-    // TODO WET
-    internal class ResearchCosts
-    {
-        internal enum Type
-        {
-            Funds,
-            Science
-        }
-
-        internal static bool CanPay(int amount, Type type)
-        {
-            switch (type)
-            {
-                case Type.Funds:
-                    return CanPayFunds(amount);
-                case Type.Science:
-                    return CanPayScience(amount);
-                default:
-                    throw new ArgumentException("Unknown cost type " + type);
-            }
-        }
-
-        internal static void Pay(int amount, Type type)
-        {
-            switch (type)
-            {
-                case Type.Funds:
-                    PayFunds(amount);
-                    break;
-                case Type.Science:
-                    PayScience(amount);
-                    break;
-                default:
-                    throw new ArgumentException("Unknown cost type " + type);
-            }
-        }
-
-        private static void PayScience(int amount)
-        {
-            if (HighLogic.CurrentGame.Mode != Game.Modes.CAREER &&
-                HighLogic.CurrentGame.Mode != Game.Modes.SCIENCE_SANDBOX)
-                return;
-            ResearchAndDevelopment.Instance.Science -= amount;
-        }
-
-        private static void PayFunds(int amount)
-        {
-            if (HighLogic.CurrentGame.Mode != Game.Modes.CAREER)
-                return;
-            Funding.Instance.Funds -= amount;
-        }
-
-        private static bool CanPayScience(int amount)
-        {
-            if (HighLogic.CurrentGame.Mode != Game.Modes.CAREER &&
-                HighLogic.CurrentGame.Mode != Game.Modes.SCIENCE_SANDBOX)
-                return true;
-            return ResearchAndDevelopment.Instance.Science >= amount;
-        }
-
-        private static bool CanPayFunds(int amount)
-        {
-            if (HighLogic.CurrentGame.Mode != Game.Modes.CAREER)
-                return true;
-            return Funding.Instance.Funds >= amount;
-        }
-    }
-
-
 }

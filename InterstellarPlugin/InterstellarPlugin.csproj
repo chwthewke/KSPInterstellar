@@ -106,6 +106,8 @@
     <Compile Include="PartUpgrades\Parts.cs" />
     <Compile Include="PartUpgrades\PartUpgradeScenario.cs" />
     <Compile Include="PartUpgrades\FieldParser.cs" />
+    <Compile Include="PartUpgrades\PartUpgradeTweakScaleAdapter.cs" />
+    <Compile Include="PartUpgrades\ResearchCosts.cs" />
     <Compile Include="PartUpgrades\Upgrade.cs" />
     <Compile Include="PartUpgrades\UpgradeModule.cs" />
     <Compile Include="PartUpgrades\UpgradeRequirement.cs" />
