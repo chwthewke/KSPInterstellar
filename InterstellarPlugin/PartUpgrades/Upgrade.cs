@@ -6,9 +6,9 @@ namespace InterstellarPlugin.PartUpgrades
     {
 
         public static Upgrade FromSourceField(
-            PartModule targetModule, BaseField targetField, PartModule sourceModule, BaseField sourceField)
+            PartModule targetModule, BaseField targetField, BaseField sourceField)
         {
-            return new Upgrade(targetModule, targetField, new FieldUpgradeSource(sourceModule, sourceField));
+            return new Upgrade(targetModule, targetField, new FieldUpgradeSource(targetModule, sourceField));
         }
 
         public static Upgrade FromValue(

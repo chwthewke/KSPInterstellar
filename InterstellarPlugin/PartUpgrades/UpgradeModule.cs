@@ -65,7 +65,8 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override void OnStart(StartState state)
         {
-            
+//            upgrades = Config.GetNodes(UpgradeKey).Select(LoadUpgrade).ToList();
+//            requirements = Config.GetNodes(RequirementKey).Select(LoadRequirement).ToList();
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Started {0}.", this));
 #endif
@@ -75,8 +76,8 @@ namespace InterstellarPlugin.PartUpgrades
         {
             return string.Format("{0} for {1}: upgrades = [{2}], requirements = [{3}], config = <{4}>", 
                 GetType(), part.name,
-                string.Join(", ", upgrades.Select(o => o.ToString()).ToArray()),
-                string.Join(", ", requirements.Select(o => o.ToString()).ToArray()),
+                upgrades == null ? "null" : string.Join(", ", upgrades.Select(o => o.ToString()).ToArray()),
+                requirements == null ? "null" : string.Join(", ", requirements.Select(o => o.ToString()).ToArray()),
                 Config);
         }
 
@@ -140,6 +141,20 @@ namespace InterstellarPlugin.PartUpgrades
             return null;
         }
 
+        private Upgrade LoadUpgrade(ConfigNode node)
+        {
+            var module = node.GetValue(ModuleKey);
+            var targetModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.name == module);
+            var targetField = FindField(targetModule, node.GetValue(TargetKey));
+            string source = node.GetValue(SourceKey);
+            if (source != null)
+            {
+                var sourceField = FindField(targetModule, source);
+                return Upgrade.FromSourceField(targetModule, targetField, sourceField);
+            }
+            return Upgrade.FromValue(targetModule, targetField, node.GetValue(ValueKey));
+        }
+
         private string ValidateRequirement(ConfigNode node)
         {
             var @object = ConfigNode.CreateObjectFromConfig(node);
@@ -150,6 +165,11 @@ namespace InterstellarPlugin.PartUpgrades
                 return string.Format("Upgrade requirement type {0} is not an {1}",
                     @object.GetType().Name, typeof (UpgradeRequirement).Name);
             return requirement.Validate(part);
+        }
+
+        private UpgradeRequirement LoadRequirement(ConfigNode node)
+        {
+            return ConfigNode.CreateObjectFromConfig(node) as UpgradeRequirement;
         }
 
         private static BaseField FindField(PartModule partModule, string name)
