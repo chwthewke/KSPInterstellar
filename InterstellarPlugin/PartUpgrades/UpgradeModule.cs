@@ -23,6 +23,9 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override void OnLoad(ConfigNode node)
         {
+            // TODO temp
+            Debug.Log("OnLoad " + part.LogPartName());
+
             // AFAIK, this is more or less the only way to copy complex data structures from the loaded part prefab
             // to an instance in editor/flight (other that packing data to strings).
             Config = new ConfigNode();
@@ -66,6 +69,9 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override void OnStart(StartState state)
         {
+            // TODO temp
+            Debug.Log("OnLoad " + part.LogPartName());
+
             upgrades = Config.GetNodes(UpgradeKey).Select(LoadUpgrade).ToList();
             requirements = Config.GetNodes(RequirementKey).Select(LoadRequirement).ToList();
 #if DEBUG

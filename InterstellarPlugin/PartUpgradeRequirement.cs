@@ -2,16 +2,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using InterstellarPlugin.PartUpgrades;
 using UnityEngine;
 
 namespace InterstellarPlugin
 {
     class PartUpgradeRequirements
     {
-        private delegate PartUpgradeRequirement RequirementFactory(PartUpgradeModule module, ConfigNode config);
+        private delegate PartUpgradeRequirement RequirementFactory(UpgradeModule module, ConfigNode config);
 
         private const string TypeKey = "name";
-        public static PartUpgradeRequirement CreateRequirement(PartUpgradeModule module, ConfigNode node)
+        public static PartUpgradeRequirement CreateRequirement(UpgradeModule module, ConfigNode node)
         {
             var requirementType = node.GetValue(TypeKey);
             var factory = factories[requirementType];
@@ -24,7 +25,7 @@ namespace InterstellarPlugin
         private static readonly IDictionary<string, RequirementFactory> factories =
             new Dictionary<string, RequirementFactory>
             {
-                {"UnlockTech", (m, n) => new UnlockTech(n)}
+                {"UnlockTech", (m, n) => new UnlockTech_OLD(n)}
             };
 
         // TODO allow registration of external requirement types?
@@ -32,14 +33,14 @@ namespace InterstellarPlugin
 
     public abstract class PartUpgradeRequirement
     {
-        private PartUpgradeModule module;
+        private UpgradeModule module;
 
-        protected PartUpgradeModule Module
+        protected UpgradeModule Module
         {
             get { return module; }
         }
 
-        internal void Start(PartUpgradeModule upgradeModule)
+        internal void Start(UpgradeModule upgradeModule)
         {
             module = upgradeModule;
             OnStart();
@@ -59,16 +60,16 @@ namespace InterstellarPlugin
     }
 
     [Serializable]
-    class UnlockTech : PartUpgradeRequirement
+    class UnlockTech_OLD : PartUpgradeRequirement
     {
         private const string TechIdKey = "techID";
 
         [SerializeField]
         public string techId;
 
-        public UnlockTech() { }
+        public UnlockTech_OLD() { }
 
-        public UnlockTech(ConfigNode node)
+        public UnlockTech_OLD(ConfigNode node)
             : this()
         {
             techId = node.GetValue(TechIdKey);
@@ -192,7 +193,7 @@ namespace InterstellarPlugin
             RemoveUpgradeAction();
 
             // TODO change to event on PartUpgradeScenario
-            Module.IsUpgraded = true;
+            //Module.IsUpgraded = true;
         }
 
         public override string ToString()

@@ -1,10 +1,15 @@
-﻿using System.Reflection;
-using UnityEngine;
-
-namespace InterstellarPlugin.PartUpgrades
+﻿namespace InterstellarPlugin.PartUpgrades
 {
     public abstract class UpgradeRequirement
     {
+        [KSPField]
+        public string id;
+
+        public string Id
+        {
+            get { return id; }
+        }
+
         public virtual string Validate(Part part)
         {
             return null;
