@@ -2,6 +2,10 @@
 
 namespace InterstellarPlugin.PartUpgrades
 {
+    /// <summary>
+    /// Utility functions to Parse (or TryParse) some of the KSPField types. Currently supported are
+    /// bool, int, float, string, and enums.
+    /// </summary>
     internal class FieldParser
     {
         public static bool TryParse(Type type, string value, out object obj)

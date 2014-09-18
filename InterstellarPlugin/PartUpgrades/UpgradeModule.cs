@@ -23,9 +23,6 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override void OnLoad(ConfigNode node)
         {
-            // TODO temp
-            Debug.Log("OnLoad " + part.LogPartName());
-
             // AFAIK, this is more or less the only way to copy complex data structures from the loaded part prefab
             // to an instance in editor/flight (other that packing data to strings).
             Config = new ConfigNode();
@@ -42,7 +39,7 @@ namespace InterstellarPlugin.PartUpgrades
                 {
                     Debug.LogWarning(
                         string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                            GetType().Name, part.name, UpgradeKey, index, error));
+                            GetType().Name, part.OriginalName(), UpgradeKey, index, error));
                 }
             }
 
@@ -58,7 +55,7 @@ namespace InterstellarPlugin.PartUpgrades
                 {
                     Debug.LogWarning(
                         string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                            GetType().Name, part.name, RequirementKey, index, error));
+                            GetType().Name, part.OriginalName(), RequirementKey, index, error));
                 }
             }
 
@@ -69,9 +66,6 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override void OnStart(StartState state)
         {
-            // TODO temp
-            Debug.Log("OnLoad " + part.LogPartName());
-
             upgrades = Config.GetNodes(UpgradeKey).Select(LoadUpgrade).ToList();
             requirements = Config.GetNodes(RequirementKey).Select(LoadRequirement).ToList();
 #if DEBUG
@@ -82,7 +76,7 @@ namespace InterstellarPlugin.PartUpgrades
         public override string ToString()
         {
             return string.Format("{0} for {1}: upgrades = [{2}], requirements = [{3}], config = <{4}>",
-                GetType(), part.name,
+                GetType(), part.OriginalName(),
                 upgrades == null ? "null" : string.Join(", ", upgrades.Select(o => o.ToString()).ToArray()),
                 requirements == null ? "null" : string.Join(", ", requirements.Select(o => o.ToString()).ToArray()),
                 Config);
@@ -129,7 +123,7 @@ namespace InterstellarPlugin.PartUpgrades
                     return string.Format("The value {0} cannot be parsed as {1}:{2}",
                         value, target, fieldType.Name);
             }
-            // The source field must be found and its type must agree with the target's type.
+                // The source field must be found and its type must agree with the target's type.
             else
             {
                 var sourceField = FindField(partModule, source);
@@ -139,7 +133,7 @@ namespace InterstellarPlugin.PartUpgrades
 
                 Type sourceType = sourceField.FieldInfo.FieldType;
                 bool compatible = sourceType == targetType ||
-                                  (targetType == typeof(float) && sourceType == typeof(int));
+                                  (targetType == typeof (float) && sourceType == typeof (int));
                 if (!compatible)
                     return string.Format("source {0}: {1} is not compatible with target type {2}: {3}",
                         source, sourceType.Name, target, targetType.Name);
@@ -164,13 +158,10 @@ namespace InterstellarPlugin.PartUpgrades
 
         private string ValidateRequirement(ConfigNode node)
         {
-            var requirementName = node.GetValue(NameKey);
-            var type = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .FirstOrDefault(t => t.Name == requirementName);
+            var type = RequirementType(node);
 
             if (type == null)
-                return "Cound not find a type named " + requirementName; 
+                return "Cound not find a type named " + node.GetValue(NameKey);
 
             var @object = ConfigNode.CreateObjectFromConfig(type.AssemblyQualifiedName, node);
             if (@object == null)
@@ -178,13 +169,22 @@ namespace InterstellarPlugin.PartUpgrades
             var requirement = @object as UpgradeRequirement;
             if (requirement == null)
                 return string.Format("Upgrade requirement type {0} is not an {1}",
-                    @object.GetType().AssemblyQualifiedName, typeof(UpgradeRequirement).Name);
+                    @object.GetType().AssemblyQualifiedName, typeof (UpgradeRequirement).Name);
             return requirement.Validate(part);
+        }
+
+        private static Type RequirementType(ConfigNode node)
+        {
+            var type = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => a.GetTypes())
+                .FirstOrDefault(t => t.Name == node.GetValue(NameKey));
+            return type;
         }
 
         private UpgradeRequirement LoadRequirement(ConfigNode node)
         {
-            return ConfigNode.CreateObjectFromConfig(node) as UpgradeRequirement;
+            var typeName = RequirementType(node).AssemblyQualifiedName;
+            return ConfigNode.CreateObjectFromConfig(typeName, node) as UpgradeRequirement;
         }
 
         private static BaseField FindField(PartModule partModule, string name)

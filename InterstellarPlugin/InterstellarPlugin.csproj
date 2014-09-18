@@ -103,13 +103,9 @@
     <Compile Include="ModuleModableScienceGenerator.cs" />
     <Compile Include="ModuleSabreHeating.cs" />
     <Compile Include="ModuleSolarSail.cs" />
-    <Compile Include="PartUpgradeRequirement.cs" />
     <Compile Include="PartUpgrades\Parts.cs" />
     <Compile Include="PartUpgrades\PartUpgradeScenario.cs" />
     <Compile Include="PartUpgrades\FieldParser.cs" />
-    <Compile Include="PartUpgrades\NodeValidation.cs" />
-    <Compile Include="PartUpgrades\ProtoRequirement.cs" />
-    <Compile Include="PartUpgrades\ProtoUpgrade.cs" />
     <Compile Include="PartUpgrades\Upgrade.cs" />
     <Compile Include="PartUpgrades\UpgradeModule.cs" />
     <Compile Include="PartUpgrades\UpgradeRequirement.cs" />
