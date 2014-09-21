@@ -5,18 +5,6 @@ namespace InterstellarPlugin.PartUpgrades
 {
     public abstract class UpgradeRequirement
     {
-        [KSPField]
-        public string id;
-
-        public string Id
-        {
-            get { return id; }
-        }
-
-        public virtual string Validate(Part part)
-        {
-            return null;
-        }
 
         public void Start(UpgradeModule parent)
         {
@@ -26,6 +14,11 @@ namespace InterstellarPlugin.PartUpgrades
 
         public virtual void OnStart()
         {
+        }
+
+        public virtual string Validate(Part part)
+        {
+            return null;
         }
 
         public abstract bool IsFulfilled();
@@ -71,6 +64,21 @@ namespace InterstellarPlugin.PartUpgrades
 
     internal abstract class PersistentRequirement : UpgradeRequirement
     {
+        [KSPField]
+        public string id;
+
+        public string Id
+        {
+            get { return id; }
+        }
+
+        public override string Validate(Part part)
+        {
+            if (string.IsNullOrEmpty(id))
+                return "'id' is a required field for persistent upgrade requirements";
+            return null;
+        }
+
         public override bool IsFulfilled()
         {
             var scenario = PartUpgradeScenario.Instance;

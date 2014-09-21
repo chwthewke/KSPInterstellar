@@ -181,7 +181,7 @@ namespace InterstellarPlugin.PartUpgrades
             var type = RequirementType(node);
 
             if (type == null)
-                return "Cound not find a type named " + node.GetValue(NameKey);
+                return "Cound not find a requirement type named " + node.GetValue(NameKey);
 
             var @object = ConfigNode.CreateObjectFromConfig(type.AssemblyQualifiedName, node);
             if (@object == null)
