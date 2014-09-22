@@ -9,7 +9,7 @@ namespace InterstellarPlugin.PartUpgrades
         public static Upgrade FromScalableValue(
             PartModule targetModule, BaseField targetField, float value, float exponent)
         {
-            return new Upgrade(targetModule, targetField, new ScalableUpgradeSource(value, exponent));
+            return new Upgrade(targetModule, targetField, new ScalableUpgradeSource(targetField.FieldInfo.FieldType, value, exponent));
         }
 
         public static Upgrade FromValue(
@@ -76,17 +76,22 @@ namespace InterstellarPlugin.PartUpgrades
     {
         public object GetValue(float scaleFactor)
         {
-            return value * Math.Pow(scaleFactor, exponent);
+            double scaled = value * Math.Pow(scaleFactor, exponent);
+            if (integral)
+                return (int)scaled;
+            return (float)scaled;
         }
 
-        public ScalableUpgradeSource(float value, float exponent)
+        public ScalableUpgradeSource(Type targetType, float value, float exponent)
         {
+            integral = targetType == typeof(int);
             this.value = value;
             this.exponent = exponent;
         }
 
         private readonly float value;
         private readonly float exponent;
+        private bool integral;
     }
 
 }

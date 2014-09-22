@@ -75,7 +75,7 @@ namespace InterstellarPlugin.PartUpgrades
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Started {0}.", this));
 #endif
-            
+
         }
 
         public void CheckRequirements()
@@ -133,35 +133,31 @@ namespace InterstellarPlugin.PartUpgrades
             if (targetField == null)
                 return string.Format("module {0} does not have a field named {1}", module, target);
 
-            // Either source or value must be set, not both.
-//            if (string.IsNullOrEmpty(source) == string.IsNullOrEmpty(value))
-//                return string.Format("One and only one of '{0}' and '{1}' must be set.", SourceKey, ValueKey);
+            // Check for the value
+            if (string.IsNullOrEmpty(value))
+                return string.Format("'{0}' must not be missing or empty.", ValueKey);
+
+            if (!string.IsNullOrEmpty(scaleExponent))
+            {
+                // The scale exponent must target a numeric field.
+                if (targetField.FieldInfo.FieldType != typeof(float) && targetField.FieldInfo.FieldType != typeof(int))
+                    return string.Format("Cannot use {0} for upgrade of field {1} as it is not a numeric field.",
+                        ExponentKey, targetField.name);
+
+                // The scale exponent must be a valid float.
+                float exponentValue;
+                if (!float.TryParse(scaleExponent, out exponentValue))
+                    return string.Format("Could not parse '{0}' {1} as a float.", ExponentKey, scaleExponent);
+            }
+
 
             // The value must agree with the target's type.
             Type targetType = targetField.FieldInfo.FieldType;
-            if (value != null)
-            {
-                object valueObj;
-                Type fieldType = targetType;
-                if (!FieldParser.TryParse(fieldType, value, out valueObj))
-                    return string.Format("The value {0} cannot be parsed as {1}:{2}",
-                        value, target, fieldType.Name);
-            }
-                // The source field must be found and its type must agree with the target's type.
-//            else
-//            {
-//                var sourceField = FindField(partModule, source);
-//                if (sourceField == null)
-//                    return string.Format("Module {0} has no field named {1}",
-//                        module, source);
-//
-//                Type sourceType = sourceField.FieldInfo.FieldType;
-//                bool compatible = sourceType == targetType ||
-//                                  (targetType == typeof (float) && sourceType == typeof (int));
-//                if (!compatible)
-//                    return string.Format("source {0}: {1} is not compatible with target type {2}: {3}",
-//                        source, sourceType.Name, target, targetType.Name);
-//            }
+            object valueObj;
+            Type fieldType = targetType;
+            if (!FieldParser.TryParse(fieldType, value, out valueObj))
+                return string.Format("The value {0} cannot be parsed as {1}:{2}",
+                    value, target, fieldType.Name);
 
             return null;
         }
@@ -171,13 +167,15 @@ namespace InterstellarPlugin.PartUpgrades
             var module = node.GetValue(ModuleKey);
             var targetModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.moduleName == module);
             var targetField = FindField(targetModule, node.GetValue(TargetKey));
-//            string source = node.GetValue(SourceKey);
-//            if (source != null)
-//            {
-//                var sourceField = FindField(targetModule, source);
-//                return Upgrade.FromSourceField(targetModule, targetField, sourceField);
-//            }
-            return Upgrade.FromValue(targetModule, targetField, node.GetValue(ValueKey));
+
+            var scaleExponent = node.GetValue(ExponentKey);
+
+            if (string.IsNullOrEmpty(scaleExponent))
+                return Upgrade.FromValue(targetModule, targetField, node.GetValue(ValueKey));
+
+            var exponent = float.Parse(scaleExponent);
+            var value = float.Parse(node.GetValue(ValueKey));
+            return Upgrade.FromScalableValue(targetModule, targetField, value, exponent);
         }
 
         private string ValidateRequirement(ConfigNode node)
@@ -193,7 +191,7 @@ namespace InterstellarPlugin.PartUpgrades
             var requirement = @object as UpgradeRequirement;
             if (requirement == null)
                 return string.Format("Upgrade requirement type {0} is not an {1}",
-                    @object.GetType().AssemblyQualifiedName, typeof (UpgradeRequirement).Name);
+                    @object.GetType().AssemblyQualifiedName, typeof(UpgradeRequirement).Name);
             return requirement.Validate(part);
         }
 
