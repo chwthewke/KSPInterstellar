@@ -16,11 +16,35 @@ namespace InterstellarPlugin.PartUpgrades
         public const string RequirementKey = "REQUIREMENT";
         public const string NameKey = "name";
 
+        // Must be unique per part, used for persistence
+        [KSPField]
+        public string id;
+
+        // Used for passing existing config from OnLoad to OnStart
         [KSPField(isPersistant = false)]
         public ConfigNode Config;
 
+        // TODO move concern to PartUpgradeScenario
+        [Obsolete]
         [KSPField(isPersistant = true)]
         public bool IsUnlocked = false;
+
+        // Sets whether this upgrade is applied to the part.
+        [KSPField(isPersistant = true)]
+        public bool IsApplied = false;
+
+        // What parts to automatically upgrade when first unlocking the tech
+        // Possible values are None, Part, Vessel, All.
+        [KSPField]
+        public UnlockMode onUnlock = UnlockMode.None;
+
+        // When true, all requirements must be met to unlock, otherwise a single requirement is enough
+        [KSPField]
+        public bool requireAllToUnlock = true;
+
+        // When true, all retrofitting requirements must be met to retrofit, otherwise a single requirement is enough
+        [KSPField]
+        public bool requireAllToRetrofit = true;
 
         public override void OnLoad(ConfigNode node)
         {
@@ -76,6 +100,12 @@ namespace InterstellarPlugin.PartUpgrades
             Debug.Log(string.Format("[Interstellar] Started {0}.", this));
 #endif
 
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+            // TODO pass correct requirement node to each requirement for save.
         }
 
         public void CheckRequirements()

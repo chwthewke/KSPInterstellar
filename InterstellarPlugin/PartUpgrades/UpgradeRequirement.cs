@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace InterstellarPlugin.PartUpgrades
@@ -64,27 +65,20 @@ namespace InterstellarPlugin.PartUpgrades
 
     internal abstract class PersistentRequirement : UpgradeRequirement
     {
-        [KSPField]
-        public string id;
-
-        public string Id
-        {
-            get { return id; }
-        }
-
         public override string Validate(Part part)
         {
-            if (string.IsNullOrEmpty(id))
-                return "'id' is a required field for persistent upgrade requirements";
             return null;
         }
 
+
+        [Obsolete]
         public override bool IsFulfilled()
         {
             var scenario = PartUpgradeScenario.Instance;
             return scenario != null && scenario.IsFulfilled(AsFulfilled);
         }
 
+        [Obsolete]
         public bool Fulfill()
         {
             var scenario = PartUpgradeScenario.Instance;
@@ -96,15 +90,12 @@ namespace InterstellarPlugin.PartUpgrades
             return true;
         }
 
+        [Obsolete]
         private FulfilledRequirement AsFulfilled
         {
-            get { return new FulfilledRequirement(Module.part.partName, id); }
+            get { return new FulfilledRequirement(Module.part.partName, ""); }
         }
 
-        public override string ToString()
-        {
-            return base.ToString() + string.Format(", id = {0}", id);
-        }
     }
 
     internal class OneTimeResearch : PersistentRequirement
