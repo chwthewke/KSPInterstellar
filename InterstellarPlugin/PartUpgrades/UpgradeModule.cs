@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -11,7 +12,7 @@ namespace InterstellarPlugin.PartUpgrades
         public const string ModuleKey = "module";
         public const string TargetKey = "target";
         public const string ValueKey = "value";
-        public const string SourceKey = "source";
+        public const string ExponentKey = "scaleExponent";
         public const string RequirementKey = "REQUIREMENT";
         public const string NameKey = "name";
 
@@ -68,6 +69,9 @@ namespace InterstellarPlugin.PartUpgrades
         {
             upgrades = Config.GetNodes(UpgradeKey).Select(LoadUpgrade).ToList();
             requirements = Config.GetNodes(RequirementKey).Select(LoadRequirement).ToList();
+
+            if (state == StartState.Editor)
+                CheckRequirements();
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Started {0}.", this));
 #endif
@@ -102,7 +106,7 @@ namespace InterstellarPlugin.PartUpgrades
                 Config);
         }
 
-
+        // TODO refactor Validate/Load to external class ("ProtoUpgrade"?)
         /// <summary>
         /// Checks the validity of an UPGRADE config node.
         /// </summary>
@@ -112,8 +116,8 @@ namespace InterstellarPlugin.PartUpgrades
         {
             var module = node.GetValue(ModuleKey);
             var target = node.GetValue(TargetKey);
-            var source = node.GetValue(SourceKey);
             var value = node.GetValue(ValueKey);
+            var scaleExponent = node.GetValue(ExponentKey);
 
             // check the existence of the target module
             if (string.IsNullOrEmpty(module))
@@ -130,8 +134,8 @@ namespace InterstellarPlugin.PartUpgrades
                 return string.Format("module {0} does not have a field named {1}", module, target);
 
             // Either source or value must be set, not both.
-            if (string.IsNullOrEmpty(source) == string.IsNullOrEmpty(value))
-                return string.Format("One and only one of '{0}' and '{1}' must be set.", SourceKey, ValueKey);
+//            if (string.IsNullOrEmpty(source) == string.IsNullOrEmpty(value))
+//                return string.Format("One and only one of '{0}' and '{1}' must be set.", SourceKey, ValueKey);
 
             // The value must agree with the target's type.
             Type targetType = targetField.FieldInfo.FieldType;
@@ -144,20 +148,20 @@ namespace InterstellarPlugin.PartUpgrades
                         value, target, fieldType.Name);
             }
                 // The source field must be found and its type must agree with the target's type.
-            else
-            {
-                var sourceField = FindField(partModule, source);
-                if (sourceField == null)
-                    return string.Format("Module {0} has no field named {1}",
-                        module, source);
-
-                Type sourceType = sourceField.FieldInfo.FieldType;
-                bool compatible = sourceType == targetType ||
-                                  (targetType == typeof (float) && sourceType == typeof (int));
-                if (!compatible)
-                    return string.Format("source {0}: {1} is not compatible with target type {2}: {3}",
-                        source, sourceType.Name, target, targetType.Name);
-            }
+//            else
+//            {
+//                var sourceField = FindField(partModule, source);
+//                if (sourceField == null)
+//                    return string.Format("Module {0} has no field named {1}",
+//                        module, source);
+//
+//                Type sourceType = sourceField.FieldInfo.FieldType;
+//                bool compatible = sourceType == targetType ||
+//                                  (targetType == typeof (float) && sourceType == typeof (int));
+//                if (!compatible)
+//                    return string.Format("source {0}: {1} is not compatible with target type {2}: {3}",
+//                        source, sourceType.Name, target, targetType.Name);
+//            }
 
             return null;
         }
@@ -167,12 +171,12 @@ namespace InterstellarPlugin.PartUpgrades
             var module = node.GetValue(ModuleKey);
             var targetModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.moduleName == module);
             var targetField = FindField(targetModule, node.GetValue(TargetKey));
-            string source = node.GetValue(SourceKey);
-            if (source != null)
-            {
-                var sourceField = FindField(targetModule, source);
-                return Upgrade.FromSourceField(targetModule, targetField, sourceField);
-            }
+//            string source = node.GetValue(SourceKey);
+//            if (source != null)
+//            {
+//                var sourceField = FindField(targetModule, source);
+//                return Upgrade.FromSourceField(targetModule, targetField, sourceField);
+//            }
             return Upgrade.FromValue(targetModule, targetField, node.GetValue(ValueKey));
         }
 

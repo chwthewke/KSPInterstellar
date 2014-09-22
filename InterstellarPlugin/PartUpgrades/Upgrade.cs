@@ -1,14 +1,15 @@
 ﻿using System;
+using UnityEngine;
 
 namespace InterstellarPlugin.PartUpgrades
 {
     public class Upgrade
     {
 
-        public static Upgrade FromSourceField(
-            PartModule targetModule, BaseField targetField, BaseField sourceField)
+        public static Upgrade FromScalableValue(
+            PartModule targetModule, BaseField targetField, float value, float exponent)
         {
-            return new Upgrade(targetModule, targetField, new FieldUpgradeSource(targetModule, sourceField));
+            return new Upgrade(targetModule, targetField, new ScalableUpgradeSource(value, exponent));
         }
 
         public static Upgrade FromValue(
@@ -17,9 +18,13 @@ namespace InterstellarPlugin.PartUpgrades
             return new Upgrade(targetModule, targetField, new ValueUpgradeSource(targetField.FieldInfo.FieldType, value));
         }
 
-        public void Apply()
+        public void Apply(float scaleFactor = 1.0f)
         {
-            targetField.SetValue(upgradeSource.Value, targetModule);
+            targetField.SetValue(upgradeSource.GetValue(scaleFactor), targetModule);
+#if DEBUG
+            Debug.Log(string.Format("Set {0}.{1} = {2}",
+                targetModule.moduleName, targetField.name, targetField.GetValue(targetModule)));
+#endif
         }
 
         public override string ToString()
@@ -42,12 +47,15 @@ namespace InterstellarPlugin.PartUpgrades
 
     internal interface IUpgradeSource
     {
-        object Value { get; }
+        object GetValue(float scaleFactor);
     }
 
     internal class ValueUpgradeSource : IUpgradeSource
     {
-        public object Value { get { return value; } }
+        public object GetValue(float scaleFactor)
+        {
+            return value;
+        }
 
         public ValueUpgradeSource(Type targetType, string sourceValue)
         {
@@ -64,28 +72,21 @@ namespace InterstellarPlugin.PartUpgrades
         private readonly object value;
     }
 
-    internal class FieldUpgradeSource : IUpgradeSource
+    internal class ScalableUpgradeSource : IUpgradeSource
     {
-        public object Value
+        public object GetValue(float scaleFactor)
         {
-            get { return field.GetValue(module); }
+            return value * Math.Pow(scaleFactor, exponent);
         }
 
-        public FieldUpgradeSource(PartModule module, BaseField field)
+        public ScalableUpgradeSource(float value, float exponent)
         {
-            this.module = module;
-            this.field = field;
+            this.value = value;
+            this.exponent = exponent;
         }
 
-        public override string ToString()
-        {
-            return string.Format("{0}.{1}", module, field);
-        }
-
-        private readonly PartModule module;
-        private readonly BaseField field;
+        private readonly float value;
+        private readonly float exponent;
     }
-
-
 
 }

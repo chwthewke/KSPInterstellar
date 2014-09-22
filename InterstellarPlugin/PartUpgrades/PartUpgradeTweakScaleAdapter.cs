@@ -1,4 +1,5 @@
 using TweakScale;
+using UnityEngine;
 
 namespace InterstellarPlugin.PartUpgrades
 {
@@ -7,6 +8,9 @@ namespace InterstellarPlugin.PartUpgrades
         
         public void OnRescale(ScalingFactor factor)
         {
+#if DEBUG
+            Debug.Log(string.Format("Tweakscale applied to {0}.{1}", module.part.OriginalName(), module.moduleName));
+#endif
             module.UpdateUpgrades();
         }
 
