@@ -1,5 +1,4 @@
 ﻿using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -8,14 +7,6 @@ namespace InterstellarPlugin.PartUpgrades
 {
     public class UpgradeModule : PartModule
     {
-        public const string UpgradeKey = "UPGRADE";
-        public const string ModuleKey = "module";
-        public const string TargetKey = "target";
-        public const string ValueKey = "value";
-        public const string ExponentKey = "scaleExponent";
-        public const string RequirementKey = "REQUIREMENT";
-        public const string NameKey = "name";
-
         // Must be unique per part, used for persistence
         [KSPField]
         public string id;
@@ -52,47 +43,28 @@ namespace InterstellarPlugin.PartUpgrades
             // to an instance in editor/flight (other that packing data to strings).
             Config = new ConfigNode();
 
-            for (int index = 0; index < node.GetNodes(UpgradeKey).Length; index++)
-            {
-                var upgradeNode = node.GetNodes(UpgradeKey)[index];
-                var error = ValidateUpgrade(upgradeNode);
-                if (error == null)
-                {
-                    Config.AddNode(upgradeNode);
-                }
-                else
-                {
-                    Debug.LogWarning(
-                        string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                            GetType().Name, part.OriginalName(), UpgradeKey, index, error));
-                }
-            }
+            CopyNodes(node, UpgradeConfig.UpgradeKey, Config);
+            CopyNodes(node, RequirementConfig.RequirementKey, Config);
 
-            for (int index = 0; index < node.GetNodes(RequirementKey).Length; index++)
-            {
-                var requirementNode = node.GetNodes(RequirementKey)[index];
-                var error = ValidateRequirement(requirementNode);
-                if (error == null)
-                {
-                    Config.AddNode(requirementNode);
-                }
-                else
-                {
-                    Debug.LogWarning(
-                        string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                            GetType().Name, part.OriginalName(), RequirementKey, index, error));
-                }
-            }
-
+            var retrofitNode = node.GetNode(RequirementConfig.RetrofitKey);
+            var retrofitCopy = Config.AddNode(RequirementConfig.RetrofitKey);
+            if (retrofitNode != null)
+                CopyNodes(retrofitNode, RequirementConfig.RetrofitKey, retrofitCopy);
+            
+                
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Loaded {0}.", this));
 #endif
         }
 
+
         public override void OnStart(StartState state)
         {
-            upgrades = Config.GetNodes(UpgradeKey).Select(LoadUpgrade).ToList();
-            requirements = Config.GetNodes(RequirementKey).Select(LoadRequirement).ToList();
+            upgrades = Config.GetNodes(UpgradeConfig.UpgradeKey)
+                .SelectMany((n, i) => new UpgradeConfig(part, n, i).Load())
+                .ToList();
+            unlockRequirements = LoadRequirements(Config);
+            retrofitRequirements = LoadRequirements(Config.GetNode(RequirementConfig.RetrofitKey));
 
             if (state == StartState.Editor)
                 CheckRequirements();
@@ -100,6 +72,12 @@ namespace InterstellarPlugin.PartUpgrades
             Debug.Log(string.Format("[Interstellar] Started {0}.", this));
 #endif
 
+        }
+
+        private List<UpgradeRequirement> LoadRequirements(ConfigNode requirementNode)
+        {
+            return requirementNode.GetNodes(RequirementConfig.RequirementKey)
+                .SelectMany((n, i) => new RequirementConfig(part, n, i).Load()).ToList();
         }
 
         public override void OnSave(ConfigNode node)
@@ -110,7 +88,7 @@ namespace InterstellarPlugin.PartUpgrades
 
         public void CheckRequirements()
         {
-            IsUnlocked = requirements.All(req => req.IsFulfilled());
+            IsUnlocked = unlockRequirements.All(req => req.IsFulfilled());
 
             UpdateUpgrades();
         }
@@ -129,122 +107,23 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override string ToString()
         {
-            return string.Format("{0} for {1}: upgrades = [{2}], requirements = [{3}], config = <{4}>",
+            return string.Format("{0} for {1}: upgrades = [{2}], unlockRequirements = [{3}], retrofitRequirements = {4}, config = <{5}>",
                 GetType(), part.OriginalName(),
                 upgrades == null ? "null" : string.Join(", ", upgrades.Select(o => o.ToString()).ToArray()),
-                requirements == null ? "null" : string.Join(", ", requirements.Select(o => o.ToString()).ToArray()),
+                unlockRequirements == null ? "null" : string.Join(", ", unlockRequirements.Select(o => o.ToString()).ToArray()),
+                retrofitRequirements == null ? "null" : string.Join(", ", retrofitRequirements.Select(o => o.ToString()).ToArray()),
                 Config);
         }
 
-        // TODO refactor Validate/Load to external class ("ProtoUpgrade"?)
-        /// <summary>
-        /// Checks the validity of an UPGRADE config node.
-        /// </summary>
-        /// <param name="node">The config node to validate</param>
-        /// <returns><code>null</code> if this <code>ProtoUpgrade</code> is valid, or an error message string.</returns>
-        public string ValidateUpgrade(ConfigNode node)
+
+        private static void CopyNodes(ConfigNode node, string name, ConfigNode target)
         {
-            var module = node.GetValue(ModuleKey);
-            var target = node.GetValue(TargetKey);
-            var value = node.GetValue(ValueKey);
-            var scaleExponent = node.GetValue(ExponentKey);
-
-            // check the existence of the target module
-            if (string.IsNullOrEmpty(module))
-                return string.Format("'{0}' must not be missing or empty", ModuleKey);
-            var partModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.moduleName == module);
-            if (partModule == null)
-                return string.Format("no module named {0}", module);
-
-            // check for the target field on target module
-            if (string.IsNullOrEmpty(target))
-                return string.Format("'{0}' must not be missing or empty", TargetKey);
-            var targetField = FindField(partModule, target);
-            if (targetField == null)
-                return string.Format("module {0} does not have a field named {1}", module, target);
-
-            // Check for the value
-            if (string.IsNullOrEmpty(value))
-                return string.Format("'{0}' must not be missing or empty.", ValueKey);
-
-            if (!string.IsNullOrEmpty(scaleExponent))
-            {
-                // The scale exponent must target a numeric field.
-                if (targetField.FieldInfo.FieldType != typeof(float) && targetField.FieldInfo.FieldType != typeof(int))
-                    return string.Format("Cannot use {0} for upgrade of field {1} as it is not a numeric field.",
-                        ExponentKey, targetField.name);
-
-                // The scale exponent must be a valid float.
-                float exponentValue;
-                if (!float.TryParse(scaleExponent, out exponentValue))
-                    return string.Format("Could not parse '{0}' {1} as a float.", ExponentKey, scaleExponent);
-            }
-
-
-            // The value must agree with the target's type.
-            Type targetType = targetField.FieldInfo.FieldType;
-            object valueObj;
-            Type fieldType = targetType;
-            if (!FieldParser.TryParse(fieldType, value, out valueObj))
-                return string.Format("The value {0} cannot be parsed as {1}:{2}",
-                    value, target, fieldType.Name);
-
-            return null;
-        }
-
-        private Upgrade LoadUpgrade(ConfigNode node)
-        {
-            var module = node.GetValue(ModuleKey);
-            var targetModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.moduleName == module);
-            var targetField = FindField(targetModule, node.GetValue(TargetKey));
-
-            var scaleExponent = node.GetValue(ExponentKey);
-
-            if (string.IsNullOrEmpty(scaleExponent))
-                return Upgrade.FromValue(targetModule, targetField, node.GetValue(ValueKey));
-
-            var exponent = float.Parse(scaleExponent);
-            var value = float.Parse(node.GetValue(ValueKey));
-            return Upgrade.FromScalableValue(targetModule, targetField, value, exponent);
-        }
-
-        private string ValidateRequirement(ConfigNode node)
-        {
-            var type = RequirementType(node);
-
-            if (type == null)
-                return "Cound not find a requirement type named " + node.GetValue(NameKey);
-
-            var @object = ConfigNode.CreateObjectFromConfig(type.AssemblyQualifiedName, node);
-            if (@object == null)
-                return string.Format("Could not create object {0}", type.Name);
-            var requirement = @object as UpgradeRequirement;
-            if (requirement == null)
-                return string.Format("Upgrade requirement type {0} is not an {1}",
-                    @object.GetType().AssemblyQualifiedName, typeof(UpgradeRequirement).Name);
-            return requirement.Validate(part);
-        }
-
-        private static Type RequirementType(ConfigNode node)
-        {
-            var type = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .FirstOrDefault(t => t.Name == node.GetValue(NameKey));
-            return type;
-        }
-
-        private UpgradeRequirement LoadRequirement(ConfigNode node)
-        {
-            var typeName = RequirementType(node).AssemblyQualifiedName;
-            return ConfigNode.CreateObjectFromConfig(typeName, node) as UpgradeRequirement;
-        }
-
-        private static BaseField FindField(PartModule partModule, string name)
-        {
-            return partModule.Fields.OfType<BaseField>().FirstOrDefault(f => f.name == name);
+            foreach (var upgradeNode in node.GetNodes(name))
+                target.AddData(upgradeNode);
         }
 
         private IList<Upgrade> upgrades;
-        private IList<UpgradeRequirement> requirements;
+        private IList<UpgradeRequirement> unlockRequirements;
+        private IList<UpgradeRequirement> retrofitRequirements;
     }
 }
