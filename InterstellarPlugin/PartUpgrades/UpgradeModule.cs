@@ -20,10 +20,6 @@ namespace InterstellarPlugin.PartUpgrades
         [KSPField(isPersistant = true)]
         public bool isApplied = false;
 
-        // Local version of IsUnlocked(), tracks whether the unlock state transitions were applied.
-        [KSPField]
-        public bool isUnlocked;
-
         // What parts to automatically upgrade when first unlocking the tech
         // Possible values are None, Part, Vessel, All.
         [KSPField]
@@ -36,6 +32,31 @@ namespace InterstellarPlugin.PartUpgrades
         // When true, all retrofitting requirements must be met to retrofit, otherwise a single requirement is enough
         [KSPField]
         public bool requireAllToRetrofit = true;
+
+        // Internal state tracking
+        private State upgradeState = State.InitPending;
+
+        private State UpgradeState
+        {
+            get { return upgradeState; }
+            set
+            {
+                switch (value)
+                {
+                    case State.Locked:
+                        Lock();
+                        break;
+                    case State.Unlocked:
+                        Unlock();
+                        break;
+                    case State.Applied:
+                        Apply();
+                        break;
+                }
+                upgradeState = value;
+            }
+        }
+
 
         public override void OnLoad(ConfigNode node)
         {
@@ -64,8 +85,12 @@ namespace InterstellarPlugin.PartUpgrades
             if (!SaveRequirements(node.GetNodes(RequirementConfig.RequirementKey), unlockRequirements))
                 Debug.LogWarning(RequirementConfig.RequirementKey + " nodes modified, not saving.");
 
-            if (!SaveRequirements(node.GetNode(RequirementConfig.RetrofitKey).GetNodes(RequirementConfig.RequirementKey), retrofitRequirements))
-                Debug.LogWarning(RequirementConfig.RequirementKey + " nodes (" + RequirementConfig.RetrofitKey + ") modified, not saving.");
+            if (
+                !SaveRequirements(
+                    node.GetNode(RequirementConfig.RetrofitKey).GetNodes(RequirementConfig.RequirementKey),
+                    retrofitRequirements))
+                Debug.LogWarning(RequirementConfig.RequirementKey + " nodes (" + RequirementConfig.RetrofitKey +
+                                 ") modified, not saving.");
 
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Saved {0}: <{1}>", this, node));
@@ -85,14 +110,65 @@ namespace InterstellarPlugin.PartUpgrades
             Debug.Log(string.Format("[Interstellar] Starting {0}.", this));
 #endif
 
-            CheckApply(state);
+            UpgradeState = CheckUpgradeState(state);
+        }
+
+        // check if the unlock/applied state should change based on requirements and start conditions.
+        private State CheckUpgradeState(StartState startState)
+        {
+            if (isApplied)
+                return State.Applied;
+
+            if (IsUnlocked() ||
+                CheckRequirements(unlockRequirements, requireAllToUnlock))
+            {
+                if (IsUpgradeApplicable(startState) ||
+                    CheckRequirements(retrofitRequirements, requireAllToRetrofit))
+                    return State.Applied;
+                return State.Unlocked;
+            }
+
+            return State.Locked;
+        }
+
+
+        private void Lock()
+        {
+            foreach (var upgradeRequirement in unlockRequirements)
+                upgradeRequirement.Start(this, OnUnlockRequirementFulfilled);
+        }
+
+        private void Unlock()
+        {
+            if (UpgradeState == State.Locked)
+            {
+                foreach (var unlockRequirement in unlockRequirements)
+                    unlockRequirement.Stop();
+            }
 
             if (!IsUnlocked())
-                foreach (var upgradeRequirement in unlockRequirements)
-                    upgradeRequirement.Start(this, null /*TODO*/);
-            else if (!isApplied)
+                PartUpgradeScenario.Instance.Unlock(this);
+
+            foreach (var retrofitRequirement in retrofitRequirements)
+                retrofitRequirement.Start(this, OnRetrofitRequirementFulfilled);
+        }
+
+        private void Apply()
+        {
+            if (UpgradeState == State.Locked)
+            {
+                foreach (var unlockRequirement in unlockRequirements)
+                    unlockRequirement.Stop();
+
+                PartUpgradeScenario.Instance.Unlock(this);
+            }
+            else if (upgradeState == State.Unlocked)
+            {
                 foreach (var retrofitRequirement in retrofitRequirements)
-                    retrofitRequirement.Start(this, null /*TODO*/);
+                    retrofitRequirement.Stop();
+            }
+
+            ApplyUpgrade();
         }
 
         internal void OnRescale(ScalingFactor factor)
@@ -102,37 +178,18 @@ namespace InterstellarPlugin.PartUpgrades
 
         private void OnUnlockRequirementFulfilled()
         {
-            if (isApplied || IsUnlocked() || !CheckUnlock()) 
+            if (UpgradeState != State.Locked)
                 return;
 
-            foreach (var unlockRequirement in unlockRequirements)
-                unlockRequirement.OnStop();
+            UpgradeState = CheckUpgradeState(StartState.None);
         }
 
         private void OnRetrofitRequirementFulfilled()
         {
-            throw new NotImplementedException();
-        }
-
-        // check if the unlock/applied state should change based on requirements and start conditions.
-        private void CheckApply(StartState state)
-        {
-            if (isApplied || !CheckUnlock()) 
+            if (UpgradeState != State.Unlocked)
                 return;
-            isUnlocked = true;
-            isApplied = IsUpgradeApplicable(state) || IsRetrofitFulfilled();
-        }
 
-        private bool CheckUnlock()
-        {
-            if (IsUnlocked())
-                return true;
-
-            if (!CheckRequirements(unlockRequirements, requireAllToUnlock))
-                return false;
-
-            Unlock();
-            return true;
+            UpgradeState = CheckUpgradeState(StartState.None);
         }
 
 
@@ -159,10 +216,6 @@ namespace InterstellarPlugin.PartUpgrades
             return PartUpgradeScenario.Instance.IsUnlocked(this);
         }
 
-        private void Unlock()
-        {
-            PartUpgradeScenario.Instance.Unlock(this);
-        }
 
         private bool CheckRequirements(IEnumerable<UpgradeRequirement> requirements, bool requireAll)
         {
@@ -178,11 +231,6 @@ namespace InterstellarPlugin.PartUpgrades
             return onUnlock == UnlockMode.All;
         }
 
-        private bool IsRetrofitFulfilled()
-        {
-            return CheckRequirements(retrofitRequirements, requireAllToRetrofit);
-        }
-
         private void ApplyUpgrade()
         {
             foreach (var upgrade in upgrades)
@@ -191,12 +239,18 @@ namespace InterstellarPlugin.PartUpgrades
 
         public override string ToString()
         {
-            return string.Format("{0} for {1}: upgrades = [{2}], unlockRequirements = [{3}], retrofitRequirements = {4}, config = <{5}>",
-                GetType(), part.OriginalName(),
-                upgrades == null ? "null" : string.Join(", ", upgrades.Select(o => o.ToString()).ToArray()),
-                unlockRequirements == null ? "null" : string.Join(", ", unlockRequirements.Select(o => o.ToString()).ToArray()),
-                retrofitRequirements == null ? "null" : string.Join(", ", retrofitRequirements.Select(o => o.ToString()).ToArray()),
-                Config);
+            return
+                string.Format(
+                    "{0} for {1}: upgrades = [{2}], unlockRequirements = [{3}], retrofitRequirements = {4}, config = <{5}>",
+                    GetType(), part.OriginalName(),
+                    upgrades == null ? "null" : string.Join(", ", upgrades.Select(o => o.ToString()).ToArray()),
+                    unlockRequirements == null
+                        ? "null"
+                        : string.Join(", ", unlockRequirements.Select(o => o.ToString()).ToArray()),
+                    retrofitRequirements == null
+                        ? "null"
+                        : string.Join(", ", retrofitRequirements.Select(o => o.ToString()).ToArray()),
+                    Config);
         }
 
 
@@ -210,5 +264,12 @@ namespace InterstellarPlugin.PartUpgrades
         private IList<UpgradeRequirement> unlockRequirements;
         private IList<UpgradeRequirement> retrofitRequirements;
 
+        private enum State
+        {
+            InitPending,
+            Locked,
+            Unlocked,
+            Applied
+        }
     }
 }
