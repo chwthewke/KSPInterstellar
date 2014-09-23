@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace InterstellarPlugin.PartUpgrades
@@ -7,10 +8,16 @@ namespace InterstellarPlugin.PartUpgrades
     {
         public const string FulfilledKey = "fulfilled";
 
-        public void Start(UpgradeModule parent)
+        public void Start(UpgradeModule parent, Action onFulfill)
         {
             module = parent;
+            fulfilledAction = onFulfill;
             OnStart();
+        }
+
+        public void Stop()
+        {
+            OnStop();
         }
 
         public virtual string Validate(Part part)
@@ -22,11 +29,15 @@ namespace InterstellarPlugin.PartUpgrades
         {
         }
 
+        public virtual void OnSave(ConfigNode node)
+        {
+        }
+
         public virtual void OnStart()
         {
         }
 
-        public virtual void OnSave(ConfigNode node)
+        public virtual void OnStop()
         {
         }
 
@@ -37,6 +48,11 @@ namespace InterstellarPlugin.PartUpgrades
             get { return module; }
         }
 
+        protected Action FulfilledAction
+        {
+            get { return fulfilledAction; }
+        }
+
         public override string ToString()
         {
             var moduleDesc = module == null
@@ -45,7 +61,9 @@ namespace InterstellarPlugin.PartUpgrades
             return string.Format("{0} of {1}", typeof (UpgradeRequirement).Name, moduleDesc);
         }
 
+        // TODO useful? not sure
         private UpgradeModule module;
+        private Action fulfilledAction;
     }
 
     internal class UnlockTech : UpgradeRequirement
@@ -78,14 +96,16 @@ namespace InterstellarPlugin.PartUpgrades
             return null;
         }
 
+        // TODO replace with Fulfill() method perhaps; this is ridiculous.
         public bool Fulfilled
         {
             get { return fulfilled; }
             set
             {
-                fulfilled = value;
-                if (fulfilled)
-                    Module.CheckRequirements();
+                if (!value)
+                    return;
+                fulfilled = true;
+                FulfilledAction();
             }
         }
 

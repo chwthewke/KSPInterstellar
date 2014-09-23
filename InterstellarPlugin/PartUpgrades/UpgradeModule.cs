@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using TweakScale;
 using UnityEngine;
 
 namespace InterstellarPlugin.PartUpgrades
@@ -17,7 +18,11 @@ namespace InterstellarPlugin.PartUpgrades
 
         // Sets whether this upgrade is applied to the part.
         [KSPField(isPersistant = true)]
-        public bool IsApplied = false;
+        public bool isApplied = false;
+
+        // Local version of IsUnlocked(), tracks whether the unlock state transitions were applied.
+        [KSPField]
+        public bool isUnlocked;
 
         // What parts to automatically upgrade when first unlocking the tech
         // Possible values are None, Part, Vessel, All.
@@ -52,9 +57,24 @@ namespace InterstellarPlugin.PartUpgrades
 #endif
         }
 
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+
+            if (!SaveRequirements(node.GetNodes(RequirementConfig.RequirementKey), unlockRequirements))
+                Debug.LogWarning(RequirementConfig.RequirementKey + " nodes modified, not saving.");
+
+            if (!SaveRequirements(node.GetNode(RequirementConfig.RetrofitKey).GetNodes(RequirementConfig.RequirementKey), retrofitRequirements))
+                Debug.LogWarning(RequirementConfig.RequirementKey + " nodes (" + RequirementConfig.RetrofitKey + ") modified, not saving.");
+
+#if DEBUG
+            Debug.Log(string.Format("[Interstellar] Saved {0}: <{1}>", this, node));
+#endif
+        }
 
         public override void OnStart(StartState state)
         {
+            // Load requirements and upgrades
             upgrades = Config.GetNodes(UpgradeConfig.UpgradeKey)
                 .SelectMany((n, i) => new UpgradeConfig(part, n, i).Load())
                 .ToList();
@@ -65,24 +85,56 @@ namespace InterstellarPlugin.PartUpgrades
             Debug.Log(string.Format("[Interstellar] Starting {0}.", this));
 #endif
 
+            CheckApply(state);
 
             if (!IsUnlocked())
-                CheckRequirements();
-            if (IsUpgradeApplicable(state))
-                ApplyUpgrade();
-
+                foreach (var upgradeRequirement in unlockRequirements)
+                    upgradeRequirement.Start(this, null /*TODO*/);
+            else if (!isApplied)
+                foreach (var retrofitRequirement in retrofitRequirements)
+                    retrofitRequirement.Start(this, null /*TODO*/);
         }
 
-        public override void OnSave(ConfigNode node)
+        internal void OnRescale(ScalingFactor factor)
         {
-            base.OnSave(node);
-
-            if (!SaveRequirements(node.GetNodes(RequirementConfig.RequirementKey), unlockRequirements))
-                Debug.LogWarning(RequirementConfig.RequirementKey + " nodes modified, not saving.");
-
-            if (!SaveRequirements(node.GetNode(RequirementConfig.RetrofitKey).GetNodes(RequirementConfig.RequirementKey), retrofitRequirements))
-                Debug.LogWarning(RequirementConfig.RequirementKey + " nodes (" + RequirementConfig.RetrofitKey + ") modified, not saving.");
+            throw new NotImplementedException();
         }
+
+        private void OnUnlockRequirementFulfilled()
+        {
+            if (isApplied || IsUnlocked() || !CheckUnlock()) 
+                return;
+
+            foreach (var unlockRequirement in unlockRequirements)
+                unlockRequirement.OnStop();
+        }
+
+        private void OnRetrofitRequirementFulfilled()
+        {
+            throw new NotImplementedException();
+        }
+
+        // check if the unlock/applied state should change based on requirements and start conditions.
+        private void CheckApply(StartState state)
+        {
+            if (isApplied || !CheckUnlock()) 
+                return;
+            isUnlocked = true;
+            isApplied = IsUpgradeApplicable(state) || IsRetrofitFulfilled();
+        }
+
+        private bool CheckUnlock()
+        {
+            if (IsUnlocked())
+                return true;
+
+            if (!CheckRequirements(unlockRequirements, requireAllToUnlock))
+                return false;
+
+            Unlock();
+            return true;
+        }
+
 
         private List<UpgradeRequirement> LoadRequirements(ConfigNode requirementNode)
         {
@@ -90,7 +142,7 @@ namespace InterstellarPlugin.PartUpgrades
                 .SelectMany((n, i) => new RequirementConfig(part, n, i).Load()).ToList();
         }
 
-
+        // TODO maybe not the most robust way to align config and objects
         private static bool SaveRequirements(IList<ConfigNode> requirementNodes, IList<UpgradeRequirement> requirements)
         {
             if (requirementNodes.Count != requirements.Count)
@@ -112,24 +164,23 @@ namespace InterstellarPlugin.PartUpgrades
             PartUpgradeScenario.Instance.Unlock(this);
         }
 
-
-        public void CheckRequirements()
+        private bool CheckRequirements(IEnumerable<UpgradeRequirement> requirements, bool requireAll)
         {
-            if (unlockRequirements.All(req => req.IsFulfilled()))
-                Unlock();
+            return requireAll
+                ? requirements.All(req => req.IsFulfilled())
+                : requirements.Any(req => req.IsFulfilled());
         }
 
         private bool IsUpgradeApplicable(StartState state)
         {
             if (state == StartState.Editor || state == StartState.PreLaunch)
-                return IsUnlocked() && onUnlock != UnlockMode.None;
+                return onUnlock != UnlockMode.None;
             return onUnlock == UnlockMode.All;
         }
 
-        public void UpdateUpgrades()
+        private bool IsRetrofitFulfilled()
         {
-            if (IsUnlocked())
-                ApplyUpgrade();
+            return CheckRequirements(retrofitRequirements, requireAllToRetrofit);
         }
 
         private void ApplyUpgrade()
@@ -158,5 +209,6 @@ namespace InterstellarPlugin.PartUpgrades
         private IList<Upgrade> upgrades;
         private IList<UpgradeRequirement> unlockRequirements;
         private IList<UpgradeRequirement> retrofitRequirements;
+
     }
 }
