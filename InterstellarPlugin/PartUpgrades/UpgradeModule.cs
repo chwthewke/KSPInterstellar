@@ -7,18 +7,13 @@ namespace InterstellarPlugin.PartUpgrades
 {
     public class UpgradeModule : PartModule
     {
-        // Must be unique per part, used for persistence
+        // Used for persistence. If two or more UpgradeModules share the same id, they will be unlocked when the first is researched.
         [KSPField]
         public string id;
 
         // Used for passing existing config from OnLoad to OnStart
         [KSPField(isPersistant = false)]
         public ConfigNode Config;
-
-        // TODO move concern to PartUpgradeScenario
-        [Obsolete]
-        [KSPField(isPersistant = true)]
-        public bool IsUnlocked = false;
 
         // Sets whether this upgrade is applied to the part.
         [KSPField(isPersistant = true)]
@@ -50,8 +45,8 @@ namespace InterstellarPlugin.PartUpgrades
             var retrofitCopy = Config.AddNode(RequirementConfig.RetrofitKey);
             if (retrofitNode != null)
                 CopyNodes(retrofitNode, RequirementConfig.RetrofitKey, retrofitCopy);
-            
-                
+
+
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Loaded {0}.", this));
 #endif
@@ -66,12 +61,27 @@ namespace InterstellarPlugin.PartUpgrades
             unlockRequirements = LoadRequirements(Config);
             retrofitRequirements = LoadRequirements(Config.GetNode(RequirementConfig.RetrofitKey));
 
-            if (state == StartState.Editor)
-                CheckRequirements();
 #if DEBUG
-            Debug.Log(string.Format("[Interstellar] Started {0}.", this));
+            Debug.Log(string.Format("[Interstellar] Starting {0}.", this));
 #endif
 
+
+            if (!IsUnlocked())
+                CheckRequirements();
+            if (IsUpgradeApplicable(state))
+                ApplyUpgrade();
+
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+
+            if (!SaveRequirements(node.GetNodes(RequirementConfig.RequirementKey), unlockRequirements))
+                Debug.LogWarning(RequirementConfig.RequirementKey + " nodes modified, not saving.");
+
+            if (!SaveRequirements(node.GetNode(RequirementConfig.RetrofitKey).GetNodes(RequirementConfig.RequirementKey), retrofitRequirements))
+                Debug.LogWarning(RequirementConfig.RequirementKey + " nodes (" + RequirementConfig.RetrofitKey + ") modified, not saving.");
         }
 
         private List<UpgradeRequirement> LoadRequirements(ConfigNode requirementNode)
@@ -80,26 +90,49 @@ namespace InterstellarPlugin.PartUpgrades
                 .SelectMany((n, i) => new RequirementConfig(part, n, i).Load()).ToList();
         }
 
-        public override void OnSave(ConfigNode node)
+
+        private static bool SaveRequirements(IList<ConfigNode> requirementNodes, IList<UpgradeRequirement> requirements)
         {
-            base.OnSave(node);
-            // TODO pass correct requirement node to each requirement for save.
+            if (requirementNodes.Count != requirements.Count)
+                return false;
+
+            for (int index = 0; index < requirementNodes.Count; index++)
+                requirements[index].OnSave(requirementNodes[index]);
+
+            return true;
         }
+
+        private bool IsUnlocked()
+        {
+            return PartUpgradeScenario.Instance.IsUnlocked(this);
+        }
+
+        private void Unlock()
+        {
+            PartUpgradeScenario.Instance.Unlock(this);
+        }
+
 
         public void CheckRequirements()
         {
-            IsUnlocked = unlockRequirements.All(req => req.IsFulfilled());
+            if (unlockRequirements.All(req => req.IsFulfilled()))
+                Unlock();
+        }
 
-            UpdateUpgrades();
+        private bool IsUpgradeApplicable(StartState state)
+        {
+            if (state == StartState.Editor || state == StartState.PreLaunch)
+                return IsUnlocked() && onUnlock != UnlockMode.None;
+            return onUnlock == UnlockMode.All;
         }
 
         public void UpdateUpgrades()
         {
-            if (IsUnlocked)
-                UpgradePart();
+            if (IsUnlocked())
+                ApplyUpgrade();
         }
 
-        private void UpgradePart()
+        private void ApplyUpgrade()
         {
             foreach (var upgrade in upgrades)
                 upgrade.Apply();

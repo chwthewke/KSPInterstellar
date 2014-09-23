@@ -7,12 +7,11 @@ namespace InterstellarPlugin.PartUpgrades
     [KSPScenario(ScenarioCreationOptions.AddToAllGames, GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.SPH)]
     public class PartUpgradeScenario : ScenarioModule
     {
-        public const string ScenarioName = "KspilPartUpgrades";
+        public const string ScenarioName = "PartUpgrades";
 
-        internal const string UnlockedRequirementNode = "UNLOCKED";
+        internal const string UnlockedKey = "unlocked";
 
-        private readonly ICollection<FulfilledRequirement> fulfilledRequirements =
-            new HashSet<FulfilledRequirement>();
+        private readonly ICollection<string> unlockedUpgrades = new HashSet<string>();
 
         private static PartUpgradeScenario instance;
 
@@ -28,14 +27,14 @@ namespace InterstellarPlugin.PartUpgrades
             instance = this;
         }
 
-        public void FulfillRequirement(FulfilledRequirement requirement)
+        public void Unlock(UpgradeModule module)
         {
-            fulfilledRequirements.Add(requirement);
+            unlockedUpgrades.Add(module.id);
         }
 
-        public bool IsFulfilled(FulfilledRequirement requirement)
+        public bool IsUnlocked(UpgradeModule module)
         {
-            return fulfilledRequirements.Contains(requirement);
+            return unlockedUpgrades.Contains(module.id);
         }
 
         public override void OnSave(ConfigNode node)
@@ -44,9 +43,9 @@ namespace InterstellarPlugin.PartUpgrades
 
             node.ClearData();
 
-            foreach (var unlockedRequirement in fulfilledRequirements)
+            foreach (var unlocked in unlockedUpgrades)
             {
-                node.AddNode(unlockedRequirement.Node);
+                node.AddValue(UnlockedKey, unlocked);
             }
         }
 
@@ -54,83 +53,16 @@ namespace InterstellarPlugin.PartUpgrades
         {
             base.OnLoad(node);
 
-            foreach (var requirementNode in node.GetNodes(UnlockedRequirementNode))
+            foreach (var unlocked in node.GetValues(UnlockedKey))
             {
-                fulfilledRequirements.Add(new FulfilledRequirement(requirementNode));
+                unlockedUpgrades.Add(unlocked);
             }
 
 #if DEBUG
-            Debug.Log("[Interstellar] PartUpgradeScenario loaded with fulfilled requirements: " +
-            string.Join(", ", fulfilledRequirements.Select(r => r.ToString()).ToArray()));
+            Debug.Log("[Interstellar] PartUpgradeScenario loaded with unlocked upgrades: " +
+                string.Join(", ", unlockedUpgrades.ToArray()));
 #endif
         }
     }
 
-    public struct FulfilledRequirement
-    {
-        private const string PartKey = "part";
-        private const string IdKey = "id";
-
-        private readonly string partName;
-        private readonly string requirementId;
-
-        public FulfilledRequirement(string partName, string requirementId)
-        {
-            this.partName = partName;
-            this.requirementId = requirementId;
-        }
-
-        // TODO validate null or empty, warn, or ConfigNode.Load
-        public FulfilledRequirement(ConfigNode node)
-        {
-            partName = node.GetValue(PartKey);
-            requirementId = node.GetValue(IdKey);
-        }
-
-        public ConfigNode Node
-        {
-            get
-            {
-                var configNode = new ConfigNode(PartUpgradeScenario.UnlockedRequirementNode);
-                configNode.AddValue(PartKey, partName);
-                configNode.AddValue(IdKey, requirementId);
-                return configNode;
-            }
-        }
-
-        public string PartName
-        {
-            get { return partName; }
-        }
-
-        public string RequirementId
-        {
-            get { return requirementId; }
-        }
-
-        public bool Equals(FulfilledRequirement other)
-        {
-            return string.Equals(partName, other.partName) && string.Equals(requirementId, other.requirementId);
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj)) return false;
-            return obj is FulfilledRequirement && Equals((FulfilledRequirement)obj);
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (partName.GetHashCode() * 397) ^ requirementId.GetHashCode();
-            }
-        }
-
-        public override string ToString()
-        {
-            return string.Format("Requirement {0} for part {1}", requirementId, partName);
-        }
-
-    }
 }

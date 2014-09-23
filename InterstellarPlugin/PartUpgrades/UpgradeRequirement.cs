@@ -1,11 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 
 namespace InterstellarPlugin.PartUpgrades
 {
     public abstract class UpgradeRequirement
     {
+        public const string FulfilledKey = "fulfilled";
 
         public void Start(UpgradeModule parent)
         {
@@ -13,13 +13,21 @@ namespace InterstellarPlugin.PartUpgrades
             OnStart();
         }
 
+        public virtual string Validate(Part part)
+        {
+            return null;
+        }
+
+        public virtual void OnLoad(ConfigNode node)
+        {
+        }
+
         public virtual void OnStart()
         {
         }
 
-        public virtual string Validate(Part part)
+        public virtual void OnSave(ConfigNode node)
         {
-            return null;
         }
 
         public abstract bool IsFulfilled();
@@ -70,32 +78,35 @@ namespace InterstellarPlugin.PartUpgrades
             return null;
         }
 
+        public bool Fulfilled
+        {
+            get { return fulfilled; }
+            set
+            {
+                fulfilled = value;
+                if (fulfilled)
+                    Module.CheckRequirements();
+            }
+        }
 
-        [Obsolete]
         public override bool IsFulfilled()
         {
-            var scenario = PartUpgradeScenario.Instance;
-            return scenario != null && scenario.IsFulfilled(AsFulfilled);
+            return fulfilled;
         }
 
-        [Obsolete]
-        public bool Fulfill()
+        public override void OnLoad(ConfigNode node)
         {
-            var scenario = PartUpgradeScenario.Instance;
-            if (scenario == null)
-                return false;
-
-            scenario.FulfillRequirement(AsFulfilled);
-
-            return true;
+            base.OnLoad(node);
+            bool.TryParse(node.GetValue(FulfilledKey), out fulfilled);
         }
 
-        [Obsolete]
-        private FulfilledRequirement AsFulfilled
+        public override void OnSave(ConfigNode node)
         {
-            get { return new FulfilledRequirement(Module.part.partName, ""); }
+            base.OnSave(node);
+            node.SetValue(FulfilledKey, fulfilled.ToString());
         }
 
+        private bool fulfilled;
     }
 
     internal class OneTimeResearch : PersistentRequirement
@@ -153,8 +164,7 @@ namespace InterstellarPlugin.PartUpgrades
 
             RemoveUpgradeAction();
 
-            Fulfill();
-            Module.CheckRequirements();
+            Fulfilled = true;
         }
 
         public override string ToString()

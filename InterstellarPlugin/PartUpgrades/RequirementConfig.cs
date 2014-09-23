@@ -23,7 +23,10 @@ namespace InterstellarPlugin.PartUpgrades
         {
             var error = ValidateRequirement();
             if (error == null)
+            {
+                requirement.OnLoad(node);
                 return new List<UpgradeRequirement> { requirement };
+            }
 
             Debug.LogWarning(
                 string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
