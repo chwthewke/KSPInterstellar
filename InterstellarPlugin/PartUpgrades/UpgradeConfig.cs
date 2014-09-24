@@ -29,7 +29,7 @@ namespace InterstellarPlugin.PartUpgrades
         {
             var error = ValidateUpgrade();
             if (error == null)
-                return new List<Upgrade> { new Upgrade(targetModule, targetField, upgradeSource) };
+                return new List<Upgrade> { new Upgrade(targetComponent, targetField, upgradeSource) };
 
             Debug.LogWarning(
                 string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
@@ -41,17 +41,26 @@ namespace InterstellarPlugin.PartUpgrades
         // Checks the validity of an UPGRADE config node. Returns a non-null error message when something is wrong.
         private string ValidateUpgrade()
         {
-            // check the existence of the target module
+            BaseFieldList fields;
+            // check the existence of the target module, otherwise the upgrade is understood to target a Part field.
             if (string.IsNullOrEmpty(module))
-                return string.Format("'{0}' must not be missing or empty", ModuleKey);
-            targetModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.moduleName == module);
-            if (targetModule == null)
-                return string.Format("no module named {0}", module);
+            {
+                fields = part.Fields;
+                targetComponent = new UpgradablePart(part);
+            }
+            else
+            {
+                var targetModule = part.Modules.OfType<PartModule>().FirstOrDefault(m => m.moduleName == module);
+                if (targetModule == null)
+                    return string.Format("no module named {0}", module);
+                fields = targetModule.Fields;
+                targetComponent = new UpgradablePartModule(targetModule);
+            }
 
-            // check for the target field on target module
+            // check for the target field on target module/part
             if (string.IsNullOrEmpty(target))
                 return string.Format("'{0}' must not be missing or empty", TargetKey);
-            targetField = targetModule.Fields.OfType<BaseField>().FirstOrDefault(f => f.name == target);
+            targetField = fields.OfType<BaseField>().FirstOrDefault(f => f.name == target);
             if (targetField == null)
                 return string.Format("module {0} does not have a field named {1}", module, target);
 
@@ -116,7 +125,7 @@ namespace InterstellarPlugin.PartUpgrades
         private readonly string target;
         private readonly string value;
         private readonly string scaleExponent;
-        private PartModule targetModule;
+        private IUpgradableComponent targetComponent;
         private BaseField targetField;
         private IUpgradeSource upgradeSource;
 

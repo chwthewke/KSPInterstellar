@@ -61,7 +61,6 @@ namespace InterstellarPlugin.PartUpgrades
             return string.Format("{0} of {1}", typeof (UpgradeRequirement).Name, moduleDesc);
         }
 
-        // TODO useful? not sure
         private UpgradeModule module;
         private Action fulfilledAction;
     }
@@ -96,17 +95,12 @@ namespace InterstellarPlugin.PartUpgrades
             return null;
         }
 
-        // TODO replace with Fulfill() method perhaps; this is ridiculous.
-        public bool Fulfilled
+        public void Fulfill()
         {
-            get { return fulfilled; }
-            set
-            {
-                if (!value)
-                    return;
-                fulfilled = true;
-                FulfilledAction();
-            }
+            if (fulfilled)
+                return;
+            fulfilled = true;
+            FulfilledAction();
         }
 
         public override bool IsFulfilled()
@@ -137,7 +131,7 @@ namespace InterstellarPlugin.PartUpgrades
         [KSPField]
         public int science;
 
-        private BaseAction researchAction;
+        private BaseEvent researchEvent;
         private List<IResearchCost> costs;
 
         public override void OnStart()
@@ -148,7 +142,13 @@ namespace InterstellarPlugin.PartUpgrades
                 return;
 
             InitCosts();
-            AddUpgradeAction();
+            AddUpgradeEvent();
+        }
+
+        public override void OnStop()
+        {
+            base.OnStop();
+            RemoveUpgradeEvent();
         }
 
         private void InitCosts()
@@ -156,17 +156,23 @@ namespace InterstellarPlugin.PartUpgrades
             costs = new List<IResearchCost> {FundsCost.Of(funds), ScienceCost.Of(science)};
         }
 
-        private void AddUpgradeAction()
+        // TODO test KSPEvent thingie
+        private void AddUpgradeEvent()
         {
-            var costStr = "Research upgrade " + string.Join(", ", costs.Select(c => c.GuiText).ToArray());
-            researchAction = new BaseAction(Module.Actions, "research", OnAction, new KSPAction(costStr));
+            researchEvent = new BaseEvent(Module.Events, "research", OnAction, EventDefinition());
 
-            Module.Actions.Add(researchAction);
+            Module.Events.Add(researchEvent);
         }
 
-        private void RemoveUpgradeAction()
+        private KSPEvent EventDefinition()
         {
-            Module.Actions.Remove(researchAction);
+            var costStr = "Research upgrade " + string.Join(", ", costs.Select(c => c.GuiText).ToArray());
+            return new KSPEvent {active = true, guiActive = true, guiName = costStr};
+        }
+
+        private void RemoveUpgradeEvent()
+        {
+            Module.Events.Remove(researchEvent);
         }
 
         private void OnAction(KSPActionParam param)
@@ -181,10 +187,7 @@ namespace InterstellarPlugin.PartUpgrades
             foreach (var cost in costs)
                 cost.Pay();
 
-
-            RemoveUpgradeAction();
-
-            Fulfilled = true;
+            Fulfill();
         }
 
         public override string ToString()

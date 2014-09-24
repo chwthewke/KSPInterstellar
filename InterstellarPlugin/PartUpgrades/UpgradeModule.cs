@@ -25,6 +25,10 @@ namespace InterstellarPlugin.PartUpgrades
         [KSPField]
         public UnlockMode onUnlock = UnlockMode.None;
 
+        // When true, the part never starts upgraded after research.
+        [KSPField]
+        public bool mustRetrofit;
+
         // When true, all requirements must be met to unlock, otherwise a single requirement is enough
         [KSPField]
         public bool requireAllToUnlock = true;
@@ -32,6 +36,8 @@ namespace InterstellarPlugin.PartUpgrades
         // When true, all retrofitting requirements must be met to retrofit, otherwise a single requirement is enough
         [KSPField]
         public bool requireAllToRetrofit = true;
+
+        private float scaleFactor = 1;
 
         // Internal state tracking
         private State upgradeState = State.InitPending;
@@ -41,19 +47,20 @@ namespace InterstellarPlugin.PartUpgrades
             get { return upgradeState; }
             set
             {
+                var previousState = upgradeState;
+                upgradeState = value;
                 switch (value)
                 {
                     case State.Locked:
-                        Lock();
+                        Lock(previousState);
                         break;
                     case State.Unlocked:
-                        Unlock();
+                        Unlock(previousState);
                         break;
                     case State.Applied:
-                        Apply();
+                        Apply(previousState);
                         break;
                 }
-                upgradeState = value;
             }
         }
 
@@ -106,6 +113,9 @@ namespace InterstellarPlugin.PartUpgrades
             unlockRequirements = LoadRequirements(Config);
             retrofitRequirements = LoadRequirements(Config.GetNode(RequirementConfig.RetrofitKey));
 
+            // TODO check if scenario is reinitialised on scene change (and thus sheds its event listeners)
+            if (state != StartState.Editor)
+                PartUpgradeScenario.Instance.onUpgradeUnlock.Add(OnGlobalUnlock);
 #if DEBUG
             Debug.Log(string.Format("[Interstellar] Starting {0}.", this));
 #endif
@@ -122,7 +132,7 @@ namespace InterstellarPlugin.PartUpgrades
             if (IsUnlocked() ||
                 CheckRequirements(unlockRequirements, requireAllToUnlock))
             {
-                if (IsUpgradeApplicable(startState) ||
+                if (ShouldStartUpgraded(startState) ||
                     CheckRequirements(retrofitRequirements, requireAllToRetrofit))
                     return State.Applied;
                 return State.Unlocked;
@@ -131,49 +141,77 @@ namespace InterstellarPlugin.PartUpgrades
             return State.Locked;
         }
 
-
-        private void Lock()
+        // Go to the "Locked" state (ie upgrade must be researched)
+        private void Lock(State previous)
         {
+            if (previous != State.InitPending)
+                return;
+
             foreach (var upgradeRequirement in unlockRequirements)
                 upgradeRequirement.Start(this, OnUnlockRequirementFulfilled);
         }
 
-        private void Unlock()
+        // Go to the "Unlocked" state (ie upgrade is researched but not applied to this part)
+        private void Unlock(State previous)
         {
-            if (UpgradeState == State.Locked)
+            if (previous == State.Locked)
             {
                 foreach (var unlockRequirement in unlockRequirements)
                     unlockRequirement.Stop();
             }
 
-            if (!IsUnlocked())
-                PartUpgradeScenario.Instance.Unlock(this);
+            if (previous < State.Unlocked)
+                foreach (var retrofitRequirement in retrofitRequirements)
+                    retrofitRequirement.Start(this, OnRetrofitRequirementFulfilled);
 
-            foreach (var retrofitRequirement in retrofitRequirements)
-                retrofitRequirement.Start(this, OnRetrofitRequirementFulfilled);
+            PartUpgradeScenario.Instance.Unlock(this);
         }
 
-        private void Apply()
+        // Go to the "Applied" state (ie upgrade is applied to this part)
+        private void Apply(State previous)
         {
-            if (UpgradeState == State.Locked)
+            if (previous == State.Locked)
             {
                 foreach (var unlockRequirement in unlockRequirements)
                     unlockRequirement.Stop();
-
-                PartUpgradeScenario.Instance.Unlock(this);
             }
-            else if (upgradeState == State.Unlocked)
+            else if (previous == State.Unlocked)
             {
                 foreach (var retrofitRequirement in retrofitRequirements)
                     retrofitRequirement.Stop();
             }
 
-            ApplyUpgrade();
+            PartUpgradeScenario.Instance.Unlock(this);
+
+            isApplied = true;
+            foreach (var upgrade in upgrades)
+                upgrade.Apply(scaleFactor);
         }
 
-        internal void OnRescale(ScalingFactor factor)
+        private void OnGlobalUnlock(string upgradeId, Part upgraded)
         {
-            throw new NotImplementedException();
+            if (upgradeId != id)
+                return;
+
+            if (UpgradeState == State.Applied)
+                return;
+
+            if (onUnlock == UnlockMode.None)
+                return;
+
+            if (onUnlock == UnlockMode.Part && upgraded != part)
+                return;
+
+            if (onUnlock == UnlockMode.Vessel && upgraded.vessel != part.vessel)
+                return;
+
+            UpgradeState = State.Applied;
+        }
+
+        // TweakScale integration
+        internal void OnRescale(float factor)
+        {
+            scaleFactor = factor;
         }
 
         private void OnUnlockRequirementFulfilled()
@@ -224,17 +262,11 @@ namespace InterstellarPlugin.PartUpgrades
                 : requirements.Any(req => req.IsFulfilled());
         }
 
-        private bool IsUpgradeApplicable(StartState state)
+        private bool ShouldStartUpgraded(StartState state)
         {
             if (state == StartState.Editor || state == StartState.PreLaunch)
-                return onUnlock != UnlockMode.None;
+                return !mustRetrofit;
             return onUnlock == UnlockMode.All;
-        }
-
-        private void ApplyUpgrade()
-        {
-            foreach (var upgrade in upgrades)
-                upgrade.Apply();
         }
 
         public override string ToString()

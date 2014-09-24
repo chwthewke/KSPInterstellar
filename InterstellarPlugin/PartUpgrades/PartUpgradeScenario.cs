@@ -9,27 +9,34 @@ namespace InterstellarPlugin.PartUpgrades
     {
         public const string ScenarioName = "PartUpgrades";
 
-        internal const string UnlockedKey = "unlocked";
+        public EventData<string, Part> onUpgradeUnlock = new EventData<string, Part>("onUpgradeUnlock");
+
+        private const string UnlockedKey = "unlocked";
 
         private readonly ICollection<string> unlockedUpgrades = new HashSet<string>();
 
-        private static PartUpgradeScenario instance;
 
         public static PartUpgradeScenario Instance
         {
-            get { return instance; }
+            get
+            {
+                var game = HighLogic.CurrentGame;
+                if (game == null)
+                    return null;
+                return game.scenarios
+                    .Select(s => s.moduleRef)
+                    .OfType<PartUpgradeScenario>()
+                    .FirstOrDefault();
+            }
         }
 
-        public override void OnAwake()
-        {
-            if (instance != null)
-                return;
-            instance = this;
-        }
 
         public void Unlock(UpgradeModule module)
         {
+            var wasUnlocked = IsUnlocked(module);
             unlockedUpgrades.Add(module.id);
+            if (!wasUnlocked)
+                onUpgradeUnlock.Fire(module.id, module.part);
         }
 
         public bool IsUnlocked(UpgradeModule module)

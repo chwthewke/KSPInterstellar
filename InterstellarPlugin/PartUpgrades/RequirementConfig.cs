@@ -24,7 +24,6 @@ namespace InterstellarPlugin.PartUpgrades
             var error = ValidateRequirement();
             if (error == null)
             {
-                requirement.OnLoad(node);
                 return new List<UpgradeRequirement> { requirement };
             }
 
@@ -38,6 +37,7 @@ namespace InterstellarPlugin.PartUpgrades
         // Validates a REQUIREMENT configuration node. Returns a non-null error message if something goes wrong.
         private string ValidateRequirement()
         {
+            // Must find a type matching the requirement name
             type = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
                 .FirstOrDefault(t => t.Name == node.GetValue(NameKey));
@@ -45,15 +45,22 @@ namespace InterstellarPlugin.PartUpgrades
             if (type == null)
                 return "Cound not find a requirement type named " + node.GetValue(NameKey);
 
+            // That type must extend UpgradeRequirement
             if (!typeof (UpgradeRequirement).IsAssignableFrom(type))
                 return string.Format("Requirement type {0} found but is does not extend {1}.",
                     type.AssemblyQualifiedName, typeof (UpgradeRequirement).Name);
 
+            // The requirement's KSPFields are loaded from config
             var @object = ConfigNode.CreateObjectFromConfig(type.AssemblyQualifiedName, node);
             
             requirement = @object as UpgradeRequirement;
             if (requirement == null)
                 return String.Format("Could not create object {0}", type.Name);
+
+            // The requirement object has an opportunity to do custom loading
+            requirement.OnLoad(node);
+
+            // The requirement object can validate its config by its own rules
             return requirement.Validate(part);
         }
 

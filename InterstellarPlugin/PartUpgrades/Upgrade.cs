@@ -8,29 +8,76 @@ namespace InterstellarPlugin.PartUpgrades
 
         public void Apply(float scaleFactor = 1.0f)
         {
-            targetField.SetValue(upgradeSource.GetValue(scaleFactor), targetModule);
+            targetField.SetValue(upgradeSource.GetValue(scaleFactor), target.Component);
 #if DEBUG
             Debug.Log(string.Format("Set {0}.{1} = {2}",
-                targetModule.moduleName, targetField.name, targetField.GetValue(targetModule)));
+                target.ComponentName, targetField.name, targetField.GetValue(target.Component)));
 #endif
         }
 
         public override string ToString()
         {
-            return string.Format("{0}.{1} <- {2}", targetModule.name, targetField.name, upgradeSource);
+            return string.Format("{0}.{1} <- {2}", target.ComponentName, targetField.name, upgradeSource);
         }
 
-        internal Upgrade(PartModule targetModule, BaseField targetField, IUpgradeSource upgradeSource)
+
+        internal Upgrade(IUpgradableComponent target, BaseField targetField, IUpgradeSource upgradeSource)
         {
-            this.targetModule = targetModule;
+            this.target = target;
             this.targetField = targetField;
             this.upgradeSource = upgradeSource;
         }
 
 
-        private readonly PartModule targetModule;
+        private readonly IUpgradableComponent target;
         private readonly BaseField targetField;
         private readonly IUpgradeSource upgradeSource;
+    }
+
+    internal interface IUpgradableComponent
+    {
+        object Component { get; }
+        string ComponentName { get; }
+    }
+
+    internal class UpgradablePartModule: IUpgradableComponent
+    {
+        public UpgradablePartModule(PartModule module)
+        {
+            this.module = module;
+        }
+
+        public object Component
+        {
+            get { return module; }
+        }
+
+        public string ComponentName
+        {
+            get { return module.moduleName; }
+        }
+
+        private readonly PartModule module;
+    }
+
+    internal class UpgradablePart : IUpgradableComponent
+    {
+        public UpgradablePart(Part part)
+        {
+            this.part = part;
+        }
+
+        public object Component
+        {
+            get { return part; }
+        }
+
+        public string ComponentName
+        {
+            get { return part.OriginalName(); }
+        }
+
+        private readonly Part part;
     }
 
     internal interface IUpgradeSource

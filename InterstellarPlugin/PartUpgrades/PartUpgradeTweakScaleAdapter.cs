@@ -11,7 +11,7 @@ namespace InterstellarPlugin.PartUpgrades
 #if DEBUG
             Debug.Log(string.Format("Tweakscale applied to {0}.{1}", module.part.OriginalName(), module.moduleName));
 #endif
-            module.OnRescale(factor);
+            module.OnRescale(factor.absolute.linear);
         }
 
         public PartUpgradeTweakScaleAdapter(UpgradeModule module)
