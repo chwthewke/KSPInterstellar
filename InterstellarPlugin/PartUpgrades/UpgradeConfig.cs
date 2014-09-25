@@ -32,8 +32,8 @@ namespace InterstellarPlugin.PartUpgrades
                 return new List<Upgrade> { new Upgrade(targetComponent, targetField, upgradeSource) };
 
             Debug.LogWarning(
-                string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                    GetType().Name, part.OriginalName(), UpgradeKey, index, error));
+                string.Format("[{5}] {0} for {1} could not load {2} node {3}: {4}.",
+                    GetType().Name, part.OriginalName(), UpgradeKey, index, error, PartUpgrades.ModName));
 
             return Enumerable.Empty<Upgrade>();
         }

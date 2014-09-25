@@ -1,5 +1,4 @@
 ﻿using System;
-using UnityEngine;
 
 namespace InterstellarPlugin.PartUpgrades
 {
@@ -9,10 +8,9 @@ namespace InterstellarPlugin.PartUpgrades
         public void Apply(float scaleFactor = 1.0f)
         {
             targetField.SetValue(upgradeSource.GetValue(scaleFactor), target.Component);
-#if DEBUG
-            Debug.Log(string.Format("Set {0}.{1} = {2}",
+
+            PartUpgrades.LogDebug(() => string.Format("Set {0}.{1} = {2}",
                 target.ComponentName, targetField.name, targetField.GetValue(target.Component)));
-#endif
         }
 
         public override string ToString()
@@ -54,7 +52,7 @@ namespace InterstellarPlugin.PartUpgrades
 
         public string ComponentName
         {
-            get { return module.moduleName; }
+            get { return module.part.OriginalName() + "/" + module.moduleName; }
         }
 
         private readonly PartModule module;

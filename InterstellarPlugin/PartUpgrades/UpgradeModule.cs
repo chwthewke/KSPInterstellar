@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using TweakScale;
 using UnityEngine;
 
 namespace InterstellarPlugin.PartUpgrades
@@ -9,11 +9,11 @@ namespace InterstellarPlugin.PartUpgrades
     public class UpgradeModule : PartModule
     {
         // Used for persistence. If two or more UpgradeModules share the same id, they will be unlocked when the first is researched.
-        [KSPField]
+        [KSPField(isPersistant = true)]
         public string id;
 
         // Used for passing existing config from OnLoad to OnStart
-        [KSPField(isPersistant = false)]
+        [KSPField]
         public ConfigNode Config;
 
         // Sets whether this upgrade is applied to the part.
@@ -30,17 +30,23 @@ namespace InterstellarPlugin.PartUpgrades
         public bool mustRetrofit;
 
         // When true, all requirements must be met to unlock, otherwise a single requirement is enough
+        // In the absence of any requirement, true means auto-unlock, false cannot unlock (dubious usefulness either way)
         [KSPField]
         public bool requireAllToUnlock = true;
 
         // When true, all retrofitting requirements must be met to retrofit, otherwise a single requirement is enough
+        // In the absence of any requirement, true means auto-retrofit (equivalent to onUnlock = all), false cannot retrofit
         [KSPField]
-        public bool requireAllToRetrofit = true;
+        public bool requireAllToRetrofit = false;
 
+        // Tracks Tweakscale tweaking
         private float scaleFactor = 1;
 
         // Internal state tracking
         private State upgradeState = State.InitPending;
+
+        // Allow neutering if something is wrong.
+        private bool valid = true;
 
         private State UpgradeState
         {
@@ -61,12 +67,24 @@ namespace InterstellarPlugin.PartUpgrades
                         Apply(previousState);
                         break;
                 }
+
+                PartUpgrades.LogDebug(() => string.Format("[{0}] {1} for {2}: set UpgradeState to {3}.", PartUpgrades.ModName, GetType().Name, part.OriginalName(), upgradeState));
             }
         }
 
 
         public override void OnLoad(ConfigNode node)
         {
+            // id is required
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogWarning(string.Format("[{0}] {1} for {2}: Missing 'id', upgrades will not work.",
+                    PartUpgrades.ModName, GetType().Name, part.OriginalName()));
+                valid = false;
+                return;
+            }
+
+
             // AFAIK, this is more or less the only way to copy complex data structures from the loaded part prefab
             // to an instance in editor/flight (other that packing data to strings).
             Config = new ConfigNode();
@@ -77,48 +95,50 @@ namespace InterstellarPlugin.PartUpgrades
             var retrofitNode = node.GetNode(RequirementConfig.RetrofitKey);
             var retrofitCopy = Config.AddNode(RequirementConfig.RetrofitKey);
             if (retrofitNode != null)
-                CopyNodes(retrofitNode, RequirementConfig.RetrofitKey, retrofitCopy);
+                CopyNodes(retrofitNode, RequirementConfig.RequirementKey, retrofitCopy);
 
 
-#if DEBUG
-            Debug.Log(string.Format("[Interstellar] Loaded {0}.", this));
-#endif
+            PartUpgrades.LogDebug(() => string.Format("[{1}] Loaded {2} for {3}: {0}.", this, PartUpgrades.ModName, GetType().Name, part.OriginalName()));
         }
+
 
         public override void OnSave(ConfigNode node)
         {
-            base.OnSave(node);
+            if (!valid)
+                return;
+
+            node.AddData(Config);
 
             if (!SaveRequirements(node.GetNodes(RequirementConfig.RequirementKey), unlockRequirements))
                 Debug.LogWarning(RequirementConfig.RequirementKey + " nodes modified, not saving.");
 
-            if (
-                !SaveRequirements(
-                    node.GetNode(RequirementConfig.RetrofitKey).GetNodes(RequirementConfig.RequirementKey),
-                    retrofitRequirements))
+            if (!SaveRequirements(
+                node.GetNode(RequirementConfig.RetrofitKey).GetNodes(RequirementConfig.RequirementKey),
+                retrofitRequirements))
                 Debug.LogWarning(RequirementConfig.RequirementKey + " nodes (" + RequirementConfig.RetrofitKey +
                                  ") modified, not saving.");
 
-#if DEBUG
-            Debug.Log(string.Format("[Interstellar] Saved {0}: <{1}>", this, node));
-#endif
+            PartUpgrades.LogDebug(() =>
+                    string.Format("[{2}] Saved {3} for {4}: {0} -> <{1}>", this, node, PartUpgrades.ModName, GetType().Name,
+                        part.OriginalName()));
         }
 
         public override void OnStart(StartState state)
         {
+            if (!valid)
+                return;
             // Load requirements and upgrades
             upgrades = Config.GetNodes(UpgradeConfig.UpgradeKey)
                 .SelectMany((n, i) => new UpgradeConfig(part, n, i).Load())
                 .ToList();
             unlockRequirements = LoadRequirements(Config);
-            retrofitRequirements = LoadRequirements(Config.GetNode(RequirementConfig.RetrofitKey));
+            retrofitRequirements = LoadRequirements(Config.GetNode(RequirementConfig.RetrofitKey), " in " + RequirementConfig.RetrofitKey);
 
             // TODO check if scenario is reinitialised on scene change (and thus sheds its event listeners)
             if (state != StartState.Editor)
-                PartUpgradeScenario.Instance.onUpgradeUnlock.Add(OnGlobalUnlock);
-#if DEBUG
-            Debug.Log(string.Format("[Interstellar] Starting {0}.", this));
-#endif
+                WithScenario(s => s.onUpgradeUnlock.Add(OnGlobalUnlock));
+
+            PartUpgrades.LogDebug(() => string.Format("[{1}] Started {2} for {3}: {0}.", this, PartUpgrades.ModName, GetType().Name, part.OriginalName()));
 
             UpgradeState = CheckUpgradeState(state);
         }
@@ -164,7 +184,7 @@ namespace InterstellarPlugin.PartUpgrades
                 foreach (var retrofitRequirement in retrofitRequirements)
                     retrofitRequirement.Start(this, OnRetrofitRequirementFulfilled);
 
-            PartUpgradeScenario.Instance.Unlock(this);
+            WithScenario(s => s.Unlock(this));
         }
 
         // Go to the "Applied" state (ie upgrade is applied to this part)
@@ -181,12 +201,36 @@ namespace InterstellarPlugin.PartUpgrades
                     retrofitRequirement.Stop();
             }
 
-            PartUpgradeScenario.Instance.Unlock(this);
+            WithScenario(s => s.Unlock(this));
 
             isApplied = true;
             foreach (var upgrade in upgrades)
                 upgrade.Apply(scaleFactor);
         }
+
+        // TODO debug things
+
+        private void WithScenario(Action<PartUpgrades> action)
+        {
+            var scenario = PartUpgrades.Instance;
+            if (scenario == null)
+                Debug.LogWarning(string.Format("[{0}] null PartUpgrades scenario at {1}", PartUpgrades.ModName, Environment.StackTrace));
+            else
+                action(scenario);
+        }
+
+        private T WithScenario<T>(Func<PartUpgrades, T> func)
+        {
+            var scenario = PartUpgrades.Instance;
+            if (scenario == null)
+            {
+                Debug.LogWarning("null PartUpgrades scenario at " + Environment.StackTrace);
+                return default(T);
+            }
+            return func(scenario);
+        }
+
+        //
 
         private void OnGlobalUnlock(string upgradeId, Part upgraded)
         {
@@ -209,9 +253,16 @@ namespace InterstellarPlugin.PartUpgrades
         }
 
         // TweakScale integration
-        internal void OnRescale(float factor)
+        public void OnRescale(float factor)
         {
+            if (!valid)
+                return;
             scaleFactor = factor;
+            PartUpgrades.LogDebug(() =>
+                    string.Format("[{0}] {1} for {2}: scaleFactor <- {3}",
+                        PartUpgrades.ModName, GetType().Name,
+                        part.OriginalName(), scaleFactor));
+
         }
 
         private void OnUnlockRequirementFulfilled()
@@ -231,27 +282,38 @@ namespace InterstellarPlugin.PartUpgrades
         }
 
 
-        private List<UpgradeRequirement> LoadRequirements(ConfigNode requirementNode)
+        private List<UpgradeRequirement> LoadRequirements(ConfigNode requirementNode, string location = "")
         {
             return requirementNode.GetNodes(RequirementConfig.RequirementKey)
-                .SelectMany((n, i) => new RequirementConfig(part, n, i).Load()).ToList();
+                .SelectMany((n, i) => new RequirementConfig(part, n, i + location).Load()).ToList();
         }
 
         // TODO maybe not the most robust way to align config and objects
-        private static bool SaveRequirements(IList<ConfigNode> requirementNodes, IList<UpgradeRequirement> requirements)
+        private bool SaveRequirements(IList<ConfigNode> requirementNodes, IList<UpgradeRequirement> requirements)
         {
+            if (requirementNodes == null)
+                return true;
+            // TODO should return string like Validate
+            if (requirements == null)
+                return UpgradeState == State.InitPending;
+
             if (requirementNodes.Count != requirements.Count)
                 return false;
 
             for (int index = 0; index < requirementNodes.Count; index++)
-                requirements[index].OnSave(requirementNodes[index]);
+            {
+                var requirement = requirements[index];
+                ConfigNode requirementNode = requirementNodes[index];
+                ConfigNode.CreateConfigFromObject(requirement, requirementNode);
+                requirement.OnSave(requirementNode);
+            }
 
             return true;
         }
 
         private bool IsUnlocked()
         {
-            return PartUpgradeScenario.Instance.IsUnlocked(this);
+            return WithScenario(s => s.IsUnlocked(this));
         }
 
 
@@ -289,7 +351,7 @@ namespace InterstellarPlugin.PartUpgrades
         private static void CopyNodes(ConfigNode node, string name, ConfigNode target)
         {
             foreach (var upgradeNode in node.GetNodes(name))
-                target.AddData(upgradeNode);
+                target.AddNode(upgradeNode);
         }
 
         private IList<Upgrade> upgrades;

@@ -1,22 +1,35 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+#if DEBUG
+using System.Runtime.CompilerServices;
+#endif
 using UnityEngine;
 
 namespace InterstellarPlugin.PartUpgrades
 {
     [KSPScenario(ScenarioCreationOptions.AddToAllGames, GameScenes.FLIGHT, GameScenes.EDITOR, GameScenes.SPH)]
-    public class PartUpgradeScenario : ScenarioModule
+    public class PartUpgrades : ScenarioModule
     {
-        public const string ScenarioName = "PartUpgrades";
+        public const string ModName = "PartUpgradeToolkit";
+
+        public static readonly Action<Func<string>> LogDebug =
+#if DEBUG
+            s => Debug.Log(s());
+#else
+            s => {};
+#endif
 
         public EventData<string, Part> onUpgradeUnlock = new EventData<string, Part>("onUpgradeUnlock");
 
         private const string UnlockedKey = "unlocked";
+        private const string ScenarioName = "PartUpgrades";
+        private const string NameKey = "name";
 
         private readonly ICollection<string> unlockedUpgrades = new HashSet<string>();
 
 
-        public static PartUpgradeScenario Instance
+        public static PartUpgrades Instance
         {
             get
             {
@@ -25,7 +38,7 @@ namespace InterstellarPlugin.PartUpgrades
                     return null;
                 return game.scenarios
                     .Select(s => s.moduleRef)
-                    .OfType<PartUpgradeScenario>()
+                    .OfType<PartUpgrades>()
                     .FirstOrDefault();
             }
         }
@@ -37,6 +50,8 @@ namespace InterstellarPlugin.PartUpgrades
             unlockedUpgrades.Add(module.id);
             if (!wasUnlocked)
                 onUpgradeUnlock.Fire(module.id, module.part);
+
+            LogDebug(() => string.Format("[{0}] {1} Upgrade unlocked: {2} for {3}", ModName, GetType().Name, module.id, module.part.OriginalName()));
         }
 
         public bool IsUnlocked(UpgradeModule module)
@@ -48,12 +63,13 @@ namespace InterstellarPlugin.PartUpgrades
         {
             base.OnSave(node);
 
-            node.ClearData();
+            node.RemoveValues(UnlockedKey);
 
             foreach (var unlocked in unlockedUpgrades)
-            {
                 node.AddValue(UnlockedKey, unlocked);
-            }
+
+            LogDebug(() => string.Format("[{0}] {3} ({2}) saved with unlocked upgrades: {1} -> <{4}>.",
+                ModName, UpgradesText(), RuntimeHelpers.GetHashCode(this), GetType().Name, node));
         }
 
         public override void OnLoad(ConfigNode node)
@@ -61,15 +77,17 @@ namespace InterstellarPlugin.PartUpgrades
             base.OnLoad(node);
 
             foreach (var unlocked in node.GetValues(UnlockedKey))
-            {
                 unlockedUpgrades.Add(unlocked);
-            }
 
-#if DEBUG
-            Debug.Log("[Interstellar] PartUpgradeScenario loaded with unlocked upgrades: " +
-                string.Join(", ", unlockedUpgrades.ToArray()));
-#endif
+            LogDebug(() => string.Format("[{0}] {3} ({2}) loaded with unlocked upgrades: {1}.",
+                ModName, UpgradesText(), RuntimeHelpers.GetHashCode(this), GetType().Name));
         }
+
+        private string UpgradesText()
+        {
+            return string.Join(", ", unlockedUpgrades.ToArray());
+        }
+
     }
 
 }

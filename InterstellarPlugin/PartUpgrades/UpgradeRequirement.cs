@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace InterstellarPlugin.PartUpgrades
 {
+    // TODO replace [KSPField] with [Persistent], also check save
     public abstract class UpgradeRequirement
     {
         public const string FulfilledKey = "fulfilled";
@@ -56,18 +57,18 @@ namespace InterstellarPlugin.PartUpgrades
         public override string ToString()
         {
             var moduleDesc = module == null
-                ? "[unknown]"
-                : string.Format("{0}/{1}", module.part.OriginalName(), module.name);
-            return string.Format("{0} of {1}", typeof (UpgradeRequirement).Name, moduleDesc);
+                ? ""
+                : string.Format(" of {0}/{1}", module.part.OriginalName(), module.name);
+            return string.Format("{0}{1}", GetType().Name, moduleDesc);
         }
 
         private UpgradeModule module;
         private Action fulfilledAction;
     }
 
-    internal class UnlockTech : UpgradeRequirement
+    public class UnlockTech : UpgradeRequirement
     {
-        [KSPField]
+        [Persistent]
         public string techID;
 
         public override bool IsFulfilled()
@@ -88,8 +89,11 @@ namespace InterstellarPlugin.PartUpgrades
         }
     }
 
-    internal abstract class PersistentRequirement : UpgradeRequirement
+    public abstract class PersistentRequirement : UpgradeRequirement
     {
+        [Persistent(isPersistant = true)]
+        public bool fulfilled;
+
         public override string Validate(Part part)
         {
             return null;
@@ -108,66 +112,78 @@ namespace InterstellarPlugin.PartUpgrades
             return fulfilled;
         }
 
-        public override void OnLoad(ConfigNode node)
-        {
-            base.OnLoad(node);
-            bool.TryParse(node.GetValue(FulfilledKey), out fulfilled);
-        }
-
-        public override void OnSave(ConfigNode node)
-        {
-            base.OnSave(node);
-            node.SetValue(FulfilledKey, fulfilled.ToString());
-        }
-
-        private bool fulfilled;
     }
 
-    internal class OneTimeResearch : PersistentRequirement
+    public class OneTimeResearch : PersistentRequirement
     {
-        [KSPField]
+        [Persistent]
         public int funds;
 
-        [KSPField]
+        [Persistent]
         public int science;
+
+        [Persistent]
+        public string eventText;
+
+        [Persistent]
+        public bool showCost = true;
 
         private BaseEvent researchEvent;
         private List<IResearchCost> costs;
 
+        public override string Validate(Part part)
+        {
+            string v = base.Validate(part);
+            if (v != null)
+                return v;
+            if (string.IsNullOrEmpty(eventText))
+                return "'eventText' must be set.";
+            return null;
+        }
+
         public override void OnStart()
         {
+            base.OnStart();
             if (IsFulfilled())
                 return;
-            if (!HighLogic.LoadedSceneIsFlight)
-                return;
 
-            InitCosts();
-            AddUpgradeEvent();
+            if (HighLogic.LoadedSceneIsFlight)
+            {
+                InitCosts();
+                AddUpgradeEvent();
+            }
         }
 
         public override void OnStop()
         {
             base.OnStop();
-            RemoveUpgradeEvent();
+
+            if (HighLogic.LoadedSceneIsFlight)
+            {
+                RemoveUpgradeEvent();
+            }
         }
 
         private void InitCosts()
         {
-            costs = new List<IResearchCost> {FundsCost.Of(funds), ScienceCost.Of(science)};
+            costs = new List<IResearchCost> { FundsCost.Of(funds), ScienceCost.Of(science) };
         }
 
         // TODO test KSPEvent thingie
         private void AddUpgradeEvent()
         {
-            researchEvent = new BaseEvent(Module.Events, "research", OnAction, EventDefinition());
+            researchEvent = new BaseEvent(Module.Events, "research", OnEvent, new KSPEvent { active = true, guiActive = true, guiName = EventGuiText });
 
             Module.Events.Add(researchEvent);
         }
 
-        private KSPEvent EventDefinition()
+        private string EventGuiText
         {
-            var costStr = "Research upgrade " + string.Join(", ", costs.Select(c => c.GuiText).ToArray());
-            return new KSPEvent {active = true, guiActive = true, guiName = costStr};
+            get
+            {
+                var costsText = showCost ? " " + string.Join(", ", costs.Select(c => c.GuiText).ToArray()) : "";
+                return eventText + costsText;
+            }
         }
 
         private void RemoveUpgradeEvent()
@@ -175,9 +191,9 @@ namespace InterstellarPlugin.PartUpgrades
             Module.Events.Remove(researchEvent);
         }
 
-        private void OnAction(KSPActionParam param)
+        private void OnEvent(KSPActionParam param)
         {
-            var canPay = costs.Aggregate(true, (b, c) => b && c.CanPay());
+            var canPay = costs.All(c => c.CanPay());
             if (!canPay)
             {
                 ScreenMessages.PostScreenMessage("Cannot research upgrade", 3.0f);

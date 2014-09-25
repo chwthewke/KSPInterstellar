@@ -11,11 +11,11 @@ namespace InterstellarPlugin.PartUpgrades
         public const string RetrofitKey = "RETROFIT";
         public const string NameKey = "name";
 
-        public RequirementConfig(Part part, ConfigNode node, int index)
+        public RequirementConfig(Part part, ConfigNode node, string location)
         {
             this.part = part;
             this.node = node;
-            this.index = index;
+            this.location = location;
         }
 
         // Using IEnumerable as a poor man's option.
@@ -28,8 +28,8 @@ namespace InterstellarPlugin.PartUpgrades
             }
 
             Debug.LogWarning(
-                string.Format("[Interstellar] {0} for {1} could not load {2} node {3}: {4}.",
-                    GetType().Name, part.OriginalName(), RequirementKey, index, error));
+                string.Format("[{0}] {1} for {2} could not load {3} node {4}: {5}.",
+                    PartUpgrades.ModName, GetType().Name, part.OriginalName(), RequirementKey, location, error));
 
             return Enumerable.Empty<UpgradeRequirement>();
         }
@@ -66,7 +66,7 @@ namespace InterstellarPlugin.PartUpgrades
 
         private readonly Part part;
         private readonly ConfigNode node;
-        private readonly int index;
+        private readonly string location;
         private Type type;
         private UpgradeRequirement requirement;
     }
