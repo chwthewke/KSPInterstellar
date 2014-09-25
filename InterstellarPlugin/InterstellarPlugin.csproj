@@ -103,6 +103,7 @@
     <Compile Include="ModuleModableScienceGenerator.cs" />
     <Compile Include="ModuleSabreHeating.cs" />
     <Compile Include="ModuleSolarSail.cs" />
+    <Compile Include="PartUpgrades\LifecycleModule.cs" />
     <Compile Include="PartUpgrades\Parts.cs" />
     <Compile Include="PartUpgrades\PartUpgrades.cs" />
     <Compile Include="PartUpgrades\FieldParser.cs" />
