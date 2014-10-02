@@ -11,7 +11,7 @@ namespace InterstellarPlugin.PartUpgrades
         [KSPField(isPersistant = true)]
         public string id;
 
-        // Used for passing existing config from OnLoad to OnStart
+        // Used for passing existing config from prefab OnLoad to OnStart
         [KSPField]
         public ConfigNode Config;
 
