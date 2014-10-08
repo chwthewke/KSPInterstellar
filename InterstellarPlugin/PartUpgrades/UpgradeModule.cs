@@ -83,7 +83,6 @@ namespace InterstellarPlugin.PartUpgrades
                 return;
             }
 
-
             // AFAIK, this is more or less the only way to copy complex data structures from the loaded part prefab
             // to an instance in editor/flight (other that packing data to strings).
             Config = new ConfigNode();
