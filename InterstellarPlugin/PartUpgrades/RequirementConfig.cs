@@ -50,7 +50,7 @@ namespace InterstellarPlugin.PartUpgrades
                 return string.Format("Requirement type {0} found but is does not extend {1}.",
                     type.AssemblyQualifiedName, typeof (UpgradeRequirement).Name);
 
-            // The requirement's KSPFields are loaded from config
+            // The requirement's [Persistent] fields are loaded from config
             var @object = ConfigNode.CreateObjectFromConfig(type.AssemblyQualifiedName, node);
             
             requirement = @object as UpgradeRequirement;

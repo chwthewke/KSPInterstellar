@@ -134,7 +134,12 @@ namespace InterstellarPlugin.PartUpgrades
 
             // TODO check if scenario is reinitialised on scene change (and thus sheds its event listeners)
             if (state != StartState.Editor)
+            {
                 WithScenario(s => s.onUpgradeUnlock.Add(OnGlobalUnlock));
+                // TODO otherwise, does this cut it?
+                GameEvents.onGameSceneLoadRequested
+                    .Add(sc => WithScenario(s => s.onUpgradeUnlock.Remove(OnGlobalUnlock)));
+            }
 
             PartUpgrades.LogDebug(() => string.Format("[{1}] Started {2} for {3}: {0}.", this, PartUpgrades.ModName, GetType().Name, part.OriginalName()));
 

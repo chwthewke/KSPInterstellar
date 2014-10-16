@@ -4,7 +4,6 @@ using System.Linq;
 
 namespace InterstellarPlugin.PartUpgrades
 {
-    // TODO replace [KSPField] with [Persistent], also check save
     public abstract class UpgradeRequirement
     {
         public const string FulfilledKey = "fulfilled";

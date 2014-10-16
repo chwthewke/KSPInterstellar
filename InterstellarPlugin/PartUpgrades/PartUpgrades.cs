@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-#if DEBUG
 using System.Runtime.CompilerServices;
-#endif
 using UnityEngine;
 
 namespace InterstellarPlugin.PartUpgrades
@@ -28,19 +26,12 @@ namespace InterstellarPlugin.PartUpgrades
 
         private readonly ICollection<string> unlockedUpgrades = new HashSet<string>();
 
+        private static PartUpgrades instance;
 
         public static PartUpgrades Instance
         {
-            get
-            {
-                var game = HighLogic.CurrentGame;
-                if (game == null)
-                    return null;
-                return game.scenarios
-                    .Select(s => s.moduleRef)
-                    .OfType<PartUpgrades>()
-                    .FirstOrDefault();
-            }
+            get { return instance; }
+            private set { instance = value; }
         }
 
 
@@ -51,13 +42,22 @@ namespace InterstellarPlugin.PartUpgrades
             if (!wasUnlocked)
                 onUpgradeUnlock.Fire(module.id, module.part);
 
-            LogDebug(() => string.Format("[{0}] {1} Upgrade unlocked: {2} for {3}", ModName, GetType().Name, module.id, module.part.OriginalName()));
+            LogDebug(() => string.Format("[{0}] {1} Upgrade unlocked: {2} for {3}",
+                ModName, GetType().Name, module.id, module.part.OriginalName()));
         }
 
         public bool IsUnlocked(UpgradeModule module)
         {
             return unlockedUpgrades.Contains(module.id);
         }
+
+        public override void OnAwake()
+        {
+            instance = this;
+            LogDebug(() => string.Format("[{0}] {3} ({2}) OnAwake with unlocked upgrades: {1} at {4}",
+                ModName, UpgradesText(), RuntimeHelpers.GetHashCode(this), GetType().Name, Environment.StackTrace));
+        }
+
 
         public override void OnSave(ConfigNode node)
         {
@@ -87,7 +87,5 @@ namespace InterstellarPlugin.PartUpgrades
         {
             return string.Join(", ", unlockedUpgrades.ToArray());
         }
-
     }
-
 }
