@@ -34,11 +34,11 @@
   <ItemGroup>
     <Reference Include="Assembly-CSharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Games\Kerbal Space Program 0.25\KSP_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>..\..\KSPLibs\0.25.0\Assembly-CSharp.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="OpenResourceSystem_1_4_2">
-      <HintPath>C:\Games\Kerbal Space Program 0.24\GameData\OpenResourceSystem\Plugins\OpenResourceSystem_1_4_2.dll</HintPath>
+    <Reference Include="OpenResourceSystem_1_4_2, Version=1.4.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\OpenResourceSystem\bin\Release\OpenResourceSystem_1_4_2.dll</HintPath>
       <Aliases>ORSv1_4_2</Aliases>
     </Reference>
     <Reference Include="System" />
@@ -49,7 +49,7 @@
     <Reference Include="System.Xml" />
     <Reference Include="UnityEngine, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Games\Kerbal Space Program 0.25\KSP_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>..\..\KSPLibs\0.25.0\UnityEngine.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
