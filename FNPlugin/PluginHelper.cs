@@ -66,26 +66,16 @@ namespace FNPlugin {
 			return is_thermal_dissip_disabled;
 		}
 
-		public static bool hasTech(string techid) {
-			try{
-				string persistentfile = KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/persistent.sfs";
-				ConfigNode config = ConfigNode.Load (persistentfile);
-				ConfigNode gameconf = config.GetNode ("GAME");
-				ConfigNode[] scenarios = gameconf.GetNodes ("SCENARIO");
-				foreach (ConfigNode scenario in scenarios) {
-					if (scenario.GetValue ("name") == "ResearchAndDevelopment") {
-						ConfigNode[] techs = scenario.GetNodes ("Tech");
-						foreach (ConfigNode technode in techs) {
-							if (technode.GetValue ("id") == techid) {
-								return true;
-							}
-						}
-					}
-				}
-				return false;
-			} catch (Exception ex) {
-				return false;
-			}
+		public static bool hasTech(string techid)
+		{
+		    if (HighLogic.CurrentGame == null)
+		        return false;
+		    if (!TechnologyIsInUse)
+		        return true;
+		    var rd = ResearchAndDevelopment.Instance;
+		    if (rd == null)
+		        return false;
+		    return rd.GetTechState(techid) != null;
 		}
 
         public static bool upgradeAvailable(string techid)
